@@ -248,6 +248,10 @@ static void neogeo_run(void)
 			}
 			
 			apply_cheat();//davex
+			/* Input before CPU (SNESticleRevive order): the pad snapshot
+			 * taken now is what this frame's emulation sees, instead of
+			 * the previous frame's late sample. */
+			update_inputport();
 			timer_update_cpu();
 
 			neogeo_cdda_check();
@@ -267,8 +271,6 @@ static void neogeo_run(void)
 				fix_disable_w(0);
 				spr_disable_w(0);
 			}
-
-			update_inputport();
 		}
 
 		sound_mute(1);

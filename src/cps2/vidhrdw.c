@@ -987,6 +987,14 @@ void cps2_screenrefresh(int start, int end)
 	if (start < FIRST_VISIBLE_LINE) start = FIRST_VISIBLE_LINE;
 	if (end > LAST_VISIBLE_LINE) end = LAST_VISIBLE_LINE;
 
+	/* Advance the tile-cache age counter once per frame (on the first
+	 * screen refresh call of the frame). */
+	if (start <= FIRST_VISIBLE_LINE)
+	{
+		extern uint32_t frames_displayed;
+		frames_displayed++;
+	}
+
 	cps2_scanline_start = start;
 	cps2_scanline_end   = end;
 

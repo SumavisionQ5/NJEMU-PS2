@@ -18,6 +18,10 @@
 ******************************************************************************/
 
 /* OBJECT */
+/* Tile-cache diagnostics: increments when the pool is exhausted
+ * and a sprite had to be skipped (never draw a black tile). */
+uint32_t g_tile_pool_full = 0;
+
 SPRITE ALIGN16_DATA *object_head[OBJECT_HASH_SIZE];
 SPRITE ALIGN16_DATA object_data[OBJECT_TEXTURE_SIZE];
 SPRITE ALIGN16_DATA *object_free_head;
@@ -422,13 +426,58 @@ int32_t object_get_sprite(uint32_t key)
 	Register sprite in OBJECT texture
 ------------------------------------------------------------------------*/
 
+/* Evict the least-recently-used entry so new tiles can always be
+ * registered (prevents black tiles when the pool is exhausted). */
+static void object_evict_lru(void)
+{
+	int i;
+	SPRITE *best = NULL, *best_prev = NULL;
+	uint32_t best_used = 0xFFFFFFFF;
+
+	/* Pass 1: prefer entries NOT used this frame (same rule as
+	 * delete_sprite) so eviction never aliases a slot this frame's
+	 * vertices still reference. */
+	for (i = 0; i < OBJECT_HASH_SIZE; i++)
+	{
+		SPRITE *prev = NULL, *p = object_head[i];
+		while (p)
+		{
+			if (p->used != frames_displayed && p->used < best_used)
+			{
+				best_used = p->used;
+				best = p;
+				best_prev = prev;
+			}
+			prev = p;
+			p = p->next;
+		}
+	}
+
+	if (best)
+	{
+		if (best_prev)
+			best_prev->next = best->next;
+		else
+			object_head[best->key & OBJECT_HASH_MASK] = best->next;
+		best->next = object_free_head;
+		object_free_head = best;
+		object_texture_num--;
+	}
+}
+
 int32_t object_insert_sprite(uint32_t key)
 {
 	uint16_t hash = key & OBJECT_HASH_MASK;
 	SPRITE *p = object_head[hash];
 	SPRITE *q = object_free_head;
 
-	if (!q) return -1;
+	if (!q)
+	{
+		/* pool exhausted: evict LRU and retry once */
+		object_evict_lru();
+		q = object_free_head;
+		if (!q) { g_tile_pool_full++; return -1; }
+	}
 
 	object_free_head = object_free_head->next;
 
@@ -532,13 +581,58 @@ int32_t scroll1_get_sprite(uint32_t key)
 	Register sprite in SCROLL1 texture
 ------------------------------------------------------------------------*/
 
+/* Evict the least-recently-used entry so new tiles can always be
+ * registered (prevents black tiles when the pool is exhausted). */
+static void scroll1_evict_lru(void)
+{
+	int i;
+	SPRITE *best = NULL, *best_prev = NULL;
+	uint32_t best_used = 0xFFFFFFFF;
+
+	/* Pass 1: prefer entries NOT used this frame (same rule as
+	 * delete_sprite) so eviction never aliases a slot this frame's
+	 * vertices still reference. */
+	for (i = 0; i < SCROLL1_HASH_SIZE; i++)
+	{
+		SPRITE *prev = NULL, *p = scroll1_head[i];
+		while (p)
+		{
+			if (p->used != frames_displayed && p->used < best_used)
+			{
+				best_used = p->used;
+				best = p;
+				best_prev = prev;
+			}
+			prev = p;
+			p = p->next;
+		}
+	}
+
+	if (best)
+	{
+		if (best_prev)
+			best_prev->next = best->next;
+		else
+			scroll1_head[best->key & SCROLL1_HASH_MASK] = best->next;
+		best->next = scroll1_free_head;
+		scroll1_free_head = best;
+		scroll1_texture_num--;
+	}
+}
+
 int32_t scroll1_insert_sprite(uint32_t key)
 {
 	uint16_t hash = key & SCROLL1_HASH_MASK;
 	SPRITE *p = scroll1_head[hash];
 	SPRITE *q = scroll1_free_head;
 
-	if (!q) return -1;
+	if (!q)
+	{
+		/* pool exhausted: evict LRU and retry once */
+		scroll1_evict_lru();
+		q = scroll1_free_head;
+		if (!q) { g_tile_pool_full++; return -1; }
+	}
 
 	scroll1_free_head = scroll1_free_head->next;
 
@@ -642,13 +736,58 @@ int32_t scroll2_get_sprite(uint32_t key)
 	Register sprite in SCROLL2 texture
 ------------------------------------------------------------------------*/
 
+/* Evict the least-recently-used entry so new tiles can always be
+ * registered (prevents black tiles when the pool is exhausted). */
+static void scroll2_evict_lru(void)
+{
+	int i;
+	SPRITE *best = NULL, *best_prev = NULL;
+	uint32_t best_used = 0xFFFFFFFF;
+
+	/* Pass 1: prefer entries NOT used this frame (same rule as
+	 * delete_sprite) so eviction never aliases a slot this frame's
+	 * vertices still reference. */
+	for (i = 0; i < SCROLL2_HASH_SIZE; i++)
+	{
+		SPRITE *prev = NULL, *p = scroll2_head[i];
+		while (p)
+		{
+			if (p->used != frames_displayed && p->used < best_used)
+			{
+				best_used = p->used;
+				best = p;
+				best_prev = prev;
+			}
+			prev = p;
+			p = p->next;
+		}
+	}
+
+	if (best)
+	{
+		if (best_prev)
+			best_prev->next = best->next;
+		else
+			scroll2_head[best->key & SCROLL2_HASH_MASK] = best->next;
+		best->next = scroll2_free_head;
+		scroll2_free_head = best;
+		scroll2_texture_num--;
+	}
+}
+
 int32_t scroll2_insert_sprite(uint32_t key)
 {
 	uint16_t hash = key & SCROLL2_HASH_MASK;
 	SPRITE *p = scroll2_head[hash];
 	SPRITE *q = scroll2_free_head;
 
-	if (!q) return -1;
+	if (!q)
+	{
+		/* pool exhausted: evict LRU and retry once */
+		scroll2_evict_lru();
+		q = scroll2_free_head;
+		if (!q) { g_tile_pool_full++; return -1; }
+	}
 
 	scroll2_free_head = scroll2_free_head->next;
 
@@ -752,13 +891,58 @@ int32_t scroll3_get_sprite(uint32_t key)
 	Register sprite in SCROLL3 texture
 ------------------------------------------------------------------------*/
 
+/* Evict the least-recently-used entry so new tiles can always be
+ * registered (prevents black tiles when the pool is exhausted). */
+static void scroll3_evict_lru(void)
+{
+	int i;
+	SPRITE *best = NULL, *best_prev = NULL;
+	uint32_t best_used = 0xFFFFFFFF;
+
+	/* Pass 1: prefer entries NOT used this frame (same rule as
+	 * delete_sprite) so eviction never aliases a slot this frame's
+	 * vertices still reference. */
+	for (i = 0; i < SCROLL3_HASH_SIZE; i++)
+	{
+		SPRITE *prev = NULL, *p = scroll3_head[i];
+		while (p)
+		{
+			if (p->used != frames_displayed && p->used < best_used)
+			{
+				best_used = p->used;
+				best = p;
+				best_prev = prev;
+			}
+			prev = p;
+			p = p->next;
+		}
+	}
+
+	if (best)
+	{
+		if (best_prev)
+			best_prev->next = best->next;
+		else
+			scroll3_head[best->key & SCROLL3_HASH_MASK] = best->next;
+		best->next = scroll3_free_head;
+		scroll3_free_head = best;
+		scroll3_texture_num--;
+	}
+}
+
 int32_t scroll3_insert_sprite(uint32_t key)
 {
 	uint16_t hash = key & SCROLL3_HASH_MASK;
 	SPRITE *p = scroll3_head[hash];
 	SPRITE *q = scroll3_free_head;
 
-	if (!q) return -1;
+	if (!q)
+	{
+		/* pool exhausted: evict LRU and retry once */
+		scroll3_evict_lru();
+		q = scroll3_free_head;
+		if (!q) { g_tile_pool_full++; return -1; }
+	}
 
 	scroll3_free_head = scroll3_free_head->next;
 

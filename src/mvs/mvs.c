@@ -153,6 +153,12 @@ static void neogeo_reset(void)
 	neogeo_driver_reset();
 	neogeo_video_reset();
 
+	/* "Reset Game" does not reload the BIOS, so the region / machine-mode
+	 * bytes that load_rom_user1() patched into the BIOS memory would keep
+	 * their old values.  Re-apply the patch so a Region (or Machine Mode)
+	 * changed in the in-game Settings menu actually takes effect. */
+	neogeo_apply_bios_patch();
+
 	sound_reset();
 	blit_clear_all_sprite();
 	autoframeskip_reset();
@@ -282,10 +288,13 @@ static void neogeo_run(void)
 			}
 
 			apply_cheat();//davex
+			/* Input before CPU (SNESticleRevive order): the pad snapshot
+			 * taken now is what this frame's emulation sees, instead of
+			 * the previous frame's late sample. */
+			update_inputport();
 			
 			timer_update_cpu();
 			update_screen();
-			update_inputport();
 		}
 
 		video_driver->clearScreen(video_data);

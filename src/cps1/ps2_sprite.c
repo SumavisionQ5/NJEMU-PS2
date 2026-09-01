@@ -43,12 +43,12 @@ static RECT cps_src_clip = { 64, 16, 64 + 384, 16 + 224 };
 
 static RECT cps_clip[6] =
 {
-	{  0,  0,  0 + 640,  0 + 448 },	// option_stretch = 0  (640 x 448)
-	{ 48, 24, 48 + 384, 24 + 224 },	// option_stretch = 1  (384x224)
-	{ 60,  1, 60 + 360,  1 + 270 },	// option_stretch = 2  (360x270  4:3)
-	{ 48,  1, 48 + 384,  1 + 270 },	// option_stretch = 3  (384x270 24:17)
-	{ 30,  1, 30 + 420,  1 + 270 },	// option_stretch = 4  (420x270 14:9)
-	{  0,  1,  0 + 480,  1 + 270 }	// option_stretch = 5  (480x270 16:9)
+	{  0,  0,  0 + 384,  0 + 224 },	// option_stretch = 0: 1:1 pixel-perfect (224p)
+	{  0,  0,  0 + 384,  0 + 224 },	// option_stretch = 1
+	{  0,  0,  0 + 384,  0 + 224 },	// option_stretch = 2
+	{  0,  0,  0 + 384,  0 + 224 },	// option_stretch = 3
+	{  0,  0,  0 + 384,  0 + 224 },	// option_stretch = 4
+	{  0,  0,  0 + 384,  0 + 224 }	// option_stretch = 5 (rotation also 384x224)
 };
 
 
@@ -172,6 +172,7 @@ void blit_reset(int bank_scroll1, int bank_scroll2, int bank_scroll3, uint8_t *p
 
 void blit_start(int high_layer)
 {
+
 	if (scrollh_texture_clear || high_layer != scrollh_layer_number)
 	{
 		scrollh_reset_sprite();
@@ -229,6 +230,10 @@ void blit_finish(void)
 			video_driver->copyRect(video_data, draw_frame, work_frame, &cps_src_clip, &cps_src_clip);
 			video_driver->clearFrame(video_data, COMMON_GRAPHIC_OBJECTS_DRAW_FRAME_BUFFER);
 		}
+		/* The rotated frame only covers the centred 3:4 area, so clear
+		 * the whole draw buffer first - otherwise the menu's last frame
+		 * stays visible in the side bars. */
+		video_driver->clearFrame(video_data, COMMON_GRAPHIC_OBJECTS_DRAW_FRAME_BUFFER);
 		video_driver->copyRectRotate(video_data, work_frame, draw_frame, &cps_src_clip, &cps_clip[5]);
 	}
 	else
@@ -259,13 +264,14 @@ void blit_draw_object(int16_t x, int16_t y, uint32_t code, uint16_t attr)
 			uint8_t *src, *dst, lines = 16;
 			uint8_t row, column;
 
-			if (object_texture_num == OBJECT_TEXTURE_SIZE - 1)
+			if (object_texture_num >= OBJECT_TEXTURE_SIZE - 1)
 			{
 				cps1_scan_object();
 				object_delete_sprite();
 			}
 
 			idx = object_insert_sprite(key);
+			if (idx < 0) return;
 			src = &gfx_object[code << 7];
 			col = color_table[attr & 0x0f];
 
@@ -386,13 +392,14 @@ void blit_draw_scroll1(int16_t x, int16_t y, uint32_t code, uint16_t attr, uint1
 		uint8_t *src, *dst, lines;
 		uint8_t row, column;
 
-		if (scroll1_texture_num == SCROLL1_TEXTURE_SIZE - 1)
+		if (scroll1_texture_num >= SCROLL1_TEXTURE_SIZE - 1)
 		{
 			cps1_scan_scroll1();
 			scroll1_delete_sprite();
 		}
 
 		idx = scroll1_insert_sprite(key);
+		if (idx < 0) return;
 		src = &gfx_scroll1[(code << 6) + (gfxset << 2)];
 		col = color_table[attr & 0x0f];
 
@@ -541,13 +548,14 @@ static void blit_draw_scroll2_hardware(int16_t x, int16_t y, uint32_t code, uint
 		uint8_t *src, *dst, lines;
 		uint8_t row, column;
 
-		if (scroll2_texture_num == SCROLL2_TEXTURE_SIZE - 1)
+		if (scroll2_texture_num >= SCROLL2_TEXTURE_SIZE - 1)
 		{
 			cps1_scan_scroll2();
 			scroll2_delete_sprite();
 		}
 
 		idx = scroll2_insert_sprite(key);
+		if (idx < 0) return;
 		src = &gfx_scroll2[code << 7];
 		col = color_table[attr & 0x0f];
 
@@ -650,13 +658,14 @@ void blit_draw_scroll3(int16_t x, int16_t y, uint32_t code, uint16_t attr)
 		uint8_t *src, *dst, lines;
 		uint8_t row, column;
 
-		if (scroll3_texture_num == SCROLL3_TEXTURE_SIZE - 1)
+		if (scroll3_texture_num >= SCROLL3_TEXTURE_SIZE - 1)
 		{
 			cps1_scan_scroll3();
 			scroll3_delete_sprite();
 		}
 
 		idx = scroll3_insert_sprite(key);
+		if (idx < 0) return;
 		src = &gfx_scroll3[code << 9];
 		col = color_table[attr & 0x0f];
 
@@ -768,6 +777,7 @@ void blit_draw_scroll1h(int16_t x, int16_t y, uint32_t code, uint16_t attr, uint
 		}
 
 		idx = scrollh_insert_sprite(key);
+		if (idx < 0) return;
 		src = (uint32_t *)&gfx_scroll1[(code << 6) + (gfxset << 2)];
 		pal = &video_palette[((attr & 0x1f) + 32) << 4];
 
@@ -896,6 +906,7 @@ static void blit_draw_scroll2h_hardware(int16_t x, int16_t y, uint32_t code, uin
 		}
 
 		idx = scrollh_insert_sprite(key);
+		if (idx < 0) return;
 		src = (uint32_t *)&gfx_scroll2[code << 7];
 		pal = &video_palette[((attr & 0x1f) + 64) << 4];
 
@@ -1008,6 +1019,7 @@ void blit_draw_scroll3h(int16_t x, int16_t y, uint32_t code, uint16_t attr, uint
 		}
 
 		idx = scrollh_insert_sprite(key);
+		if (idx < 0) return;
 		src = (uint32_t *)&gfx_scroll3[code << 9];
 		pal = &video_palette[((attr & 0x1f) + 96) << 4];
 

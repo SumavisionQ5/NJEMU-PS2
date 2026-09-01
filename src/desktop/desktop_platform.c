@@ -4,7 +4,38 @@
 typedef struct desktop_platform {
 } desktop_platform_t;
 
+void dbg_printf(const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	vprintf(fmt, args);
+	va_end(args);
+}
+
+/* ---- DEBUG: 68000 PC + gfxram hash trace (desktop only) ---- */
+extern c68k_struc C68K;
+extern uint16_t cps1_gfxram[];
+static void *pc_trace_thread(void *arg)
+{
+	FILE *f = fopen("/tmp/pc_trace.txt", "w");
+	while (f)
+	{
+		uint32_t h = 0;
+		int i;
+		for (i = 0; i < 0x4000; i++)
+			h = (h * 31) + (uint32_t)cps1_gfxram[i];
+		fprintf(f, "%06x %08x\n", (unsigned)(C68K.PC - C68K.BasePC), h);
+		usleep(20000);
+	}
+	return NULL;
+}
+
 static void *desktop_init(void) {
+	{
+		static pthread_t pt;
+		pthread_create(&pt, NULL, pc_trace_thread, NULL);
+	}
+
 	desktop_platform_t *desktop = (desktop_platform_t*)calloc(1, sizeof(desktop_platform_t));
 
 	// Initialize SDL for video, audio, and controller subsystems

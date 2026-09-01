@@ -53,12 +53,12 @@ static RECT cps_src_clip = { 64, 16, 64 + 384, 16 + 224 };
 
 static RECT cps_clip[6] =
 {
-	{  0,  0,  0 + 640,  0 + 448 },	// option_stretch = 0  (640 x 448)
-	{ 48, 24, 48 + 384, 24 + 224 },	// option_stretch = 1  (384x224)
-	{ 60,  1, 60 + 360,  1 + 270 },	// option_stretch = 2  (360x270  4:3)
-	{ 48,  1, 48 + 384,  1 + 270 },	// option_stretch = 3  (384x270 24:17)
-	{ 30,  1, 30 + 420,  1 + 270 },	// option_stretch = 4  (420x270 14:9)
-	{  0,  1,  0 + 480,  1 + 270 }		// option_stretch = 5  (480x270 16:9)
+	{  0,  0,  0 + 384,  0 + 224 },	// option_stretch = 0: 1:1 pixel-perfect (224p)
+	{  0,  0,  0 + 384,  0 + 224 },	// option_stretch = 1
+	{  0,  0,  0 + 384,  0 + 224 },	// option_stretch = 2
+	{  0,  0,  0 + 384,  0 + 224 },	// option_stretch = 3
+	{  0,  0,  0 + 384,  0 + 224 },	// option_stretch = 4
+	{  0,  0,  0 + 384,  0 + 224 }	// option_stretch = 5 (rotation also 384x224)
 };
 
 
@@ -169,6 +169,7 @@ void blit_reset(void)
 
 void blit_start(int start, int end)
 {
+
 	int i;
 
 	clip_min_y = start;
@@ -228,6 +229,10 @@ void blit_finish(void)
 			video_driver->copyRect(video_data, draw_frame, work_frame, &cps_src_clip, &cps_src_clip);
 			video_driver->clearFrame(video_data, COMMON_GRAPHIC_OBJECTS_DRAW_FRAME_BUFFER);
 		}
+		/* The rotated frame only covers the centred 3:4 area, so clear
+		 * the whole draw buffer first - otherwise the menu's last frame
+		 * stays visible in the side bars. */
+		video_driver->clearFrame(video_data, COMMON_GRAPHIC_OBJECTS_DRAW_FRAME_BUFFER);
 		video_driver->copyRectRotate(video_data, work_frame, draw_frame, &cps_src_clip, &cps_clip[5]);
 	}
 	else
@@ -259,13 +264,14 @@ void blit_draw_object(int16_t x, int16_t y, uint16_t z, int16_t pri, uint32_t co
 			uint8_t *src, *dst, lines;
 			uint8_t row, column;
 
-			if (object_texture_num == OBJECT_TEXTURE_SIZE - 1)
+			if (object_texture_num >= OBJECT_TEXTURE_SIZE - 1)
 			{
 				cps2_scan_object_callback();
 				object_delete_sprite();
 			}
 
 			idx = object_insert_sprite(key);
+			if (idx < 0) return;
 #if USE_CACHE
 			src = &memory_region_gfx1[(*read_cache)(code << 7)];
 #else
@@ -504,13 +510,14 @@ void blit_draw_scroll1(int16_t x, int16_t y, uint32_t code, uint16_t attr)
 		uint8_t *src, *dst, lines;
 		uint8_t row, column;
 
-		if (scroll1_texture_num == SCROLL1_TEXTURE_SIZE - 1)
+		if (scroll1_texture_num >= SCROLL1_TEXTURE_SIZE - 1)
 		{
 			cps2_scan_scroll1_callback();
 			scroll1_delete_sprite();
 		}
 
 		idx = scroll1_insert_sprite(key);
+		if (idx < 0) return;
 #if USE_CACHE
 		src = &memory_region_gfx1[(*read_cache)(code << 6)];
 #else
@@ -665,13 +672,14 @@ static void blit_draw_scroll2_hardware(int16_t x, int16_t y, uint32_t code, uint
 		uint8_t *src, *dst, lines;
 		uint8_t row, column;
 
-		if (scroll2_texture_num == SCROLL2_TEXTURE_SIZE - 1)
+		if (scroll2_texture_num >= SCROLL2_TEXTURE_SIZE - 1)
 		{
 			cps2_scan_scroll2_callback();
 			scroll2_delete_sprite();
 		}
 
 		idx = scroll2_insert_sprite(key);
+		if (idx < 0) return;
 #if USE_CACHE
 		src = &memory_region_gfx1[(*read_cache)(code << 7)];
 #else
@@ -781,13 +789,14 @@ void blit_draw_scroll3(int16_t x, int16_t y, uint32_t code, uint16_t attr)
 		uint8_t *src, *dst, lines;
 		uint8_t row, column;
 
-		if (scroll3_texture_num == SCROLL3_TEXTURE_SIZE - 1)
+		if (scroll3_texture_num >= SCROLL3_TEXTURE_SIZE - 1)
 		{
 			cps2_scan_scroll3_callback();
 			scroll3_delete_sprite();
 		}
 
 		idx = scroll3_insert_sprite(key);
+		if (idx < 0) return;
 #if USE_CACHE
 		src = &memory_region_gfx1[(*read_cache)(code << 9)];
 #else

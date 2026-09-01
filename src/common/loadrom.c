@@ -45,6 +45,7 @@ int64_t file_open(const char *fname1, const char *fname2, const uint32_t crc, ch
 		case 2: sprintf(path, "%sroms/%s.zip", launchDir, fname2); break;
 		}
 
+		printf("FOPEN_TRY: %s game_dir=%s launchDir=%s%c", path, game_dir, launchDir, 10);
 		if (zip_open(path) != -1)
 		{
 			if (zip_findfirst(&file))

@@ -619,7 +619,7 @@ int memory_init(void)
 		/* Use fixed settings for some options during AdHoc communication */
 		cps_raster_enable    = 1;
 		platform_cpuclock    = power_driver->getHighestCpuClock(power_data);
-		option_vsync         = 0;
+		option_vsync         = 1;
 		option_autoframeskip = 0;
 		option_frameskip     = 0;
 		option_showfps       = 0;

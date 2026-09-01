@@ -135,13 +135,62 @@ int fix_get_sprite(uint32_t key)
 	Register sprite in FIX texture
 ------------------------------------------------------------------------*/
 
+/* Evict the least-recently-used entry so new tiles can always be
+ * registered (prevents black tiles when the pool is exhausted). */
+/* Tile-cache diagnostics: incremented when the pool is exhausted
+ * and a sprite must be skipped (never draw a black tile). */
+uint32_t g_tile_pool_full = 0;
+
+static void fix_evict_lru(void)
+{
+	int i;
+	SPRITE *best = NULL, *best_prev = NULL;
+	uint32_t best_used = 0xFFFFFFFF;
+
+	/* Pass 1: prefer entries NOT used this frame (same rule as
+	 * delete_sprite) so eviction never aliases a slot this frame's
+	 * vertices still reference. */
+	for (i = 0; i < FIX_HASH_SIZE; i++)
+	{
+		SPRITE *prev = NULL, *p = fix_head[i];
+		while (p)
+		{
+			if (p->used != frames_displayed && p->used < best_used)
+			{
+				best_used = p->used;
+				best = p;
+				best_prev = prev;
+			}
+			prev = p;
+			p = p->next;
+		}
+	}
+
+	if (best)
+	{
+		if (best_prev)
+			best_prev->next = best->next;
+		else
+			fix_head[best->key & FIX_HASH_MASK] = best->next;
+		best->next = fix_free_head;
+		fix_free_head = best;
+		fix_texture_num--;
+	}
+}
+
 int fix_insert_sprite(uint32_t key)
 {
 	uint16_t hash = key & FIX_HASH_MASK;
 	SPRITE *p = fix_head[hash];
 	SPRITE *q = fix_free_head;
 
-	if (!q) return -1;
+	if (!q)
+	{
+		/* pool exhausted: evict LRU and retry once */
+		fix_evict_lru();
+		q = fix_free_head;
+		if (!q) { g_tile_pool_full++; return -1; }
+	}
 
 	fix_free_head = fix_free_head->next;
 
@@ -243,13 +292,58 @@ int spr_get_sprite(uint32_t key)
 	Register sprite in SPR texture
 ------------------------------------------------------------------------*/
 
+/* Evict the least-recently-used entry so new tiles can always be
+ * registered (prevents black tiles when the pool is exhausted). */
+static void spr_evict_lru(void)
+{
+	int i;
+	SPRITE *best = NULL, *best_prev = NULL;
+	uint32_t best_used = 0xFFFFFFFF;
+
+	/* Pass 1: prefer entries NOT used this frame (same rule as
+	 * delete_sprite) so eviction never aliases a slot this frame's
+	 * vertices still reference. */
+	for (i = 0; i < SPR_HASH_SIZE; i++)
+	{
+		SPRITE *prev = NULL, *p = spr_head[i];
+		while (p)
+		{
+			if (p->used != frames_displayed && p->used < best_used)
+			{
+				best_used = p->used;
+				best = p;
+				best_prev = prev;
+			}
+			prev = p;
+			p = p->next;
+		}
+	}
+
+	if (best)
+	{
+		if (best_prev)
+			best_prev->next = best->next;
+		else
+			spr_head[best->key & SPR_HASH_MASK] = best->next;
+		best->next = spr_free_head;
+		spr_free_head = best;
+		spr_texture_num--;
+	}
+}
+
 int spr_insert_sprite(uint32_t key)
 {
 	uint16_t hash = key & SPR_HASH_MASK;
 	SPRITE *p = spr_head[hash];
 	SPRITE *q = spr_free_head;
 
-	if (!q) return -1;
+	if (!q)
+	{
+		/* pool exhausted: evict LRU and retry once */
+		spr_evict_lru();
+		q = spr_free_head;
+		if (!q) { g_tile_pool_full++; return -1; }
+	}
 
 	spr_free_head = spr_free_head->next;
 

@@ -787,7 +787,18 @@ int input_init(void)
 	input_ui_wait = 0;
 	service_switch = 0;
 	p12_start_pressed = 0;
-	
+
+	/* DIP switches default to the factory setting (all off, 0xff).
+	 * The PSP original applies this via load_settings()/config/cps.c
+	 * (CFG_INT "DipSwitchA/B/C" default 0xff). The PS2 port has no
+	 * config system, so without this line every DIP bit reads 0 and
+	 * games that use DIP_C bit3 as the Freeze (freeze screen) switch
+	 * (sf2, cawing, dino, punisher, ...) lock up right after the
+	 * self test waiting for that bit to become 1. */
+	cps1_dipswitch[DIP_A] = 0xff;
+	cps1_dipswitch[DIP_B] = 0xff;
+	cps1_dipswitch[DIP_C] = 0xff;
+
 	memset(cps1_port_value, 0xff, sizeof(cps1_port_value));
 	memset(af_counter, 0, sizeof(af_counter));
 	memset(input_flag, 0, sizeof(input_flag));
@@ -1048,6 +1059,23 @@ void update_inputport(void)
 		{
 			showmenu();
 			setup_autofire();
+
+			/* Debounce: the menu is opened with Start+Select and Start is
+			 * also a confirm key inside it. Without waiting for a full
+			 * release, the very next update_inputport() call re-enters
+			 * showmenu(), so the menu looks like it never closes (and the
+			 * cursor appears frozen because sel resets to 0 every time). */
+			{
+				int guard;
+				for (guard = 0; guard < 45; guard++)
+				{
+					uint32_t p = poll_gamepad();
+					if ((p & (PLATFORM_PAD_START | PLATFORM_PAD_SELECT))
+					    != (PLATFORM_PAD_START | PLATFORM_PAD_SELECT))
+						break;
+					usleep(16000);
+				}
+			}
 			buttons = poll_gamepad();
 		}
 

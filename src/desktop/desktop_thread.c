@@ -37,7 +37,7 @@ static bool desktop_createThread(void *data, const char *name, int32_t (*threadF
     desktop->threadFunc = threadFunc;
     desktop->start = SDL_CreateSemaphore(0);
     desktop->end = SDL_CreateSemaphore(0);
-    desktop->thread = SDL_CreateThreadWithStackSize(childThread, name, stackSize, desktop);
+    desktop->thread = SDL_CreateThread(childThread, name, desktop);
 
 	return desktop->thread != NULL;
 }

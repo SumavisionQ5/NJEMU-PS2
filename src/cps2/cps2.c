@@ -221,9 +221,12 @@ static void cps2_run(void)
 			}
 			
 			apply_cheat();//davex
+			/* Input before CPU (SNESticleRevive order): the pad snapshot
+			 * taken now is what this frame's emulation sees, instead of
+			 * the previous frame's late sample. */
+			update_inputport();
 			timer_update_cpu();
 			update_screen();
-			update_inputport();
 		}
 
 		video_driver->clearScreen(video_data);

@@ -70,14 +70,9 @@ static void *desktop_init(layer_texture_info_t *layer_textures, uint8_t layer_te
 
 	// Create a renderer
 	SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-
-	// Check that the renderer was successfully created
 	if (renderer == NULL) {
-		// In the case that the renderer could not be made...
-		printf("Could not create renderer: %s\n", SDL_GetError());
-		SDL_DestroyWindow(desktop->window);
-		free(desktop);
-		return NULL;
+		printf("Accelerated renderer failed (%s), trying software\n", SDL_GetError());
+		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
 	}
 
 	desktop->renderer = renderer;
@@ -197,6 +192,25 @@ static void desktop_flipScreen(void *data, bool vsync)
 {
 	desktop_video_t *desktop = (desktop_video_t*)data;
 	SDL_RenderPresent(desktop->renderer);
+
+	/* DEBUG: dump frame every 30 flips */
+	{
+		static int dump_cnt = 0;
+		if ((dump_cnt++ % 30) == 0) {
+			char fname[128];
+			SDL_Rect r = { 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT };
+			SDL_Surface *surf = SDL_CreateRGBSurface(0, OUTPUT_WIDTH, OUTPUT_HEIGHT, 24,
+				0xFF0000, 0x00FF00, 0x0000FF, 0);
+			if (surf) {
+				if (SDL_RenderReadPixels(desktop->renderer, &r, SDL_PIXELFORMAT_RGB24,
+						surf->pixels, surf->pitch) == 0) {
+					sprintf(fname, "/root/dump/f%05d.bmp", dump_cnt);
+					SDL_SaveBMP(surf, fname);
+				}
+				SDL_FreeSurface(surf);
+			}
+		}
+	}
 }
 
 

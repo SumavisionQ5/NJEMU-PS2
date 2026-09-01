@@ -563,6 +563,8 @@ void neogeo_video_reset(void)
 
 void neogeo_screenrefresh(void)
 {
+	extern uint32_t frames_displayed;
+	frames_displayed++; /* new frame: advance the tile-cache age counter */
 	if (video_enable)
 	{
 		if (!spr_disable)

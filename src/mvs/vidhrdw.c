@@ -654,6 +654,8 @@ void neogeo_set_fixed_layer_source(uint8_t data)
 
 void neogeo_screenrefresh(void)
 {
+	extern uint32_t frames_displayed;
+	frames_displayed++; /* new frame: advance the tile-cache age counter */
 	if (next_update_first_line <= LAST_VISIBLE_LINE)
 	{
 		blit_start(next_update_first_line, LAST_VISIBLE_LINE);

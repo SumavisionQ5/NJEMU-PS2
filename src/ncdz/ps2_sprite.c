@@ -21,7 +21,7 @@ static RECT mvs_src_clip = { 24, 16, 24 + 304, 16 + 224 };
 
 static RECT mvs_clip[7] =
 {
-	{  0,  0,  0 + 640,  0 + 448 },	// option_stretch = 0  (640 x 448)
+	{  8,  8,  8 + 304,  8 + 224 },	// option_stretch = 0: 1:1 (304x224 centered, 240p signal)
 	{ 88, 24, 88 + 304, 24 + 224 },	// option_stretch = 1  (304x224 19:14)
 	{ 80, 16, 80 + 320, 16 + 240 },	// option_stretch = 2  (320x240  4:3)
 	{ 60,  1, 60 + 360,  1 + 270 },	// option_stretch = 3  (360x270  4:3)
@@ -89,6 +89,7 @@ void blit_reset(void)
 
 void blit_start(int start, int end)
 {
+
 	clip_min_y = start;
 	clip_max_y = end + 1;
 
@@ -139,10 +140,11 @@ void blit_draw_fix(int x, int y, uint32_t code, uint32_t attr)
 
 		tex_fix_changed = true;
 
-		if (fix_texture_num == FIX_TEXTURE_SIZE - 1)
+		if (fix_texture_num >= FIX_TEXTURE_SIZE - 1)
 			fix_delete_sprite();
 
 		idx = fix_insert_sprite(key);
+		if (idx < 0) return;
 		src = &memory_region_gfx1[code << 5];
 		col = color_table[attr];
 
@@ -215,11 +217,12 @@ void blit_draw_spr(int x, int y, int w, int h, uint32_t code, uint32_t attr)
 		uint32_t col, tile, offset;
 		uint8_t *src, *dst, lines, row, column;
 
-		if (spr_texture_num == SPR_TEXTURE_SIZE - 1)
+		if (spr_texture_num >= SPR_TEXTURE_SIZE - 1)
 			spr_delete_sprite();
 
 		src = &memory_region_gfx2[code << 7];
 		idx = spr_insert_sprite(key);
+		if (idx < 0) return;
 		col = color_table[(attr >> 8) & 0x0f];
 
 		row = idx / TILE_16x16_PER_LINE;

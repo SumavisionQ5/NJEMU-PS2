@@ -256,6 +256,22 @@ void update_inputport(void)
 	{
 		showmenu();
 		setup_autofire();
+
+		/* Debounce: the menu is opened with Start+Select and Start is
+		 * also a confirm key inside it. Without waiting for a full
+		 * release the next update_inputport() call re-enters showmenu(),
+		 * so the menu looks like it never closes. */
+		{
+			int guard;
+			for (guard = 0; guard < 45; guard++)
+			{
+				uint32_t p = poll_gamepad();
+				if ((p & (PLATFORM_PAD_START | PLATFORM_PAD_SELECT))
+				    != (PLATFORM_PAD_START | PLATFORM_PAD_SELECT))
+					break;
+				usleep(16000);
+			}
+		}
 		buttons = poll_gamepad();
 	}
 /*

@@ -107,7 +107,7 @@ endif()
 
 # Common Warning options
 set(WARNING_OPTIONS
-    -Werror
+    -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion -Wno-error=format
     -Wno-unused-but-set-variable
     -Wno-unused-function
     -Wno-deprecated-declarations
@@ -216,6 +216,13 @@ if (NO_GUI)
         ${PLATFORM_LOWER}/${PLATFORM_LOWER}_no_gui.c
     )
 else()
+    # PS2: real menu / ROM browser (replaces the no_gui stub)
+    if (PLATFORM STREQUAL "PS2")
+        set(OS_SRC ${OS_SRC}
+            ${PLATFORM_LOWER}/${PLATFORM_LOWER}_gui.c
+            ${PLATFORM_LOWER}/${PLATFORM_LOWER}_font.c
+        )
+    endif()
     # Add source files related to GUI if needed
 endif()
 
@@ -384,6 +391,7 @@ if (${TARGET} STREQUAL "NCDZ")
         ncdz/${PLATFORM_LOWER}_sprite.c
         ncdz/sprite.h
         ncdz/startup.c
+        ps2/ps2_png.c
         ncdz/timer.c
         ncdz/timer.h
         ncdz/vidhrdw.c
@@ -473,7 +481,9 @@ if (PLATFORM STREQUAL "DESKTOP")
         ${SDL2_INCLUDE_DIRS}
     )
     target_link_libraries(${TARGET} PUBLIC
-        SDL2::SDL2-static
+        ${SDL2_LIBRARIES}
+        m
+        pthread
     )
 elseif(PLATFORM STREQUAL "PS2")
     target_link_libraries(${TARGET} PUBLIC

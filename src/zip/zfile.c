@@ -44,7 +44,7 @@ int zip_open(const char *path)
 	if (unzfile != NULL) zip_close();
 
 	if ((unzfile = unzOpen(path)) != NULL)
-		return (int)unzfile;
+		return 0;	/* success (64-bit-safe: never return a truncated pointer) */
 
 	strcpy(basedir, path);
 	strcat(basedir, "/");

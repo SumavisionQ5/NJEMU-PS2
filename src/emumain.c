@@ -8,6 +8,7 @@
 
 #include <unistd.h>
 #include <limits.h>
+#include <stdio.h>
 #include "emumain.h"
 
 
@@ -125,7 +126,7 @@ static void show_fps(void)
 		game_speed_percent,
 		frames_per_second);
 
-	sx = SCR_WIDTH - (strlen(buf) << 3);
+	sx = 2; /* left-align top-left corner (right-aligned ran off-screen) */
 	printf("%s\n", buf);
 	small_font_print((int)sx, 0, buf, 1);
 }
@@ -253,7 +254,9 @@ void update_screen(void)
 	if (frameskip_counter == 0)
 		this_frame_base = last_skipcount0_time + (int)((float)FRAMESKIP_LEVELS * TICKS_PER_FRAME);
 
-	frames_displayed++;
+	/* frames_displayed is advanced once per frame at the render entry
+	 * (cps1/cps2/mvs/ncdz screenrefresh) so tile-cache age stamps are
+	 * correct DURING rendering. Only the FPS counter advances here. */
 	frames_since_last_fps++;
 
 	if (!skipped_it)
@@ -261,22 +264,32 @@ void update_screen(void)
 		uint64_t curr = ticker_driver->currentUs(ticker_data);
 		int flip = 0;
 
-		if (option_speedlimit)
+		/* Vsync is independent of the frame limiter: when enabled, always
+		 * wait for the vsync so the picture never tears - even when
+		 * Frame Limit is off (the old code only vsync'd inside the
+		 * speedlimit block, so disabling Frame Limit silently disabled
+		 * vsync and tore badly on heavy games like dino). */
+		if (option_vsync)
+		{
+			video_driver->flipScreen(video_data, 1);
+			flip = 1;
+		}
+
+		if (option_speedlimit && !flip)
 		{
 			uint64_t target = this_frame_base + (int)((float)frameskip_counter * TICKS_PER_FRAME);
 
-			if (option_vsync)
-			{
-				if (curr < target - 100)
-				{
-					video_driver->flipScreen(video_data, 1);
-					flip = 1;
-				}
-			}
-
+			/* Original PS2-port frame limiter (v20/v21): a single usleep to
+			 * the target deadline, then one fresh clock read. Kept per user
+			 * decision - the original timing is not the cause of the sf2
+			 * audio slowdown (that was a rominfo conversion bug). */
 			if (target > curr) usleep(target - curr);
 			curr = ticker_driver->currentUs(ticker_data);
 		}
+		/* If the frame overshot its deadline just flip immediately -
+		 * forcing a vsync here drops the whole emulator to 30fps with
+		 * choppy audio. Tearing during a single late frame is the lesser
+		 * evil; revisit once the render path itself is faster. */
 		if (!flip) video_driver->flipScreen(video_data, 0);
 
 		rendered_frames_since_last_fps++;
@@ -288,6 +301,25 @@ void update_screen(void)
 
 			frames_per_second = ((float)rendered_frames_since_last_fps / seconds_elapsed);
 			game_speed_percent = (frames_per_second / (float)FPS) * 100;
+
+#if 0 /* DEBUG LOG DISABLED (v16 cleanup): no njemu_diag.txt FPS report */
+			{
+				static int fps_logged = 0;
+				if (!fps_logged && frames_displayed > 300)
+				{
+					FILE *fpf = fopen("mass:/njemu_diag.txt", "a");
+					if (!fpf) fpf = fopen("njemu_diag.txt", "a");
+					if (fpf)
+					{
+						fps_logged = 1;
+						fprintf(fpf, "FPS measured=%.1f speed=%.1f%% frames=%u fs=%d%c",
+							    frames_per_second, game_speed_percent,
+							    frames_displayed, frameskip, 10);
+						fclose(fpf);
+					}
+				}
+			}
+#endif /* DEBUG LOG DISABLED */
 
 			last_skipcount0_time = curr;
 			frames_since_last_fps = 0;
@@ -451,31 +483,44 @@ void save_snapshot(void)
 
 int main(int argc, char *argv[]) {
 	printf("===> %s, %s:%i\n", __FUNCTION__, __FILE__, __LINE__);
-#if defined(NO_GUI)
-	// Some default values
+	// Default emulation options.
+	// NOTE: These were previously guarded by #if defined(NO_GUI). That was wrong
+	// for the GUI/menu builds (e.g. the PS2 native menu built with -DNO_GUI=OFF):
+	// the option_* globals have no initializers, so leaving them un-set made them
+	// all zero -> no sound, wrong speed, etc. The menu build has no config system
+	// to populate them, so always apply sensible defaults here. GUI platforms that
+	// load a saved config (PSP) simply overwrite these after main().
 	option_speedlimit = 1;
-	option_vsync = 0;
+#if defined(BUILD_CPS1) || defined(BUILD_CPS2)
+	option_vsync = 1;   /* CPS1/CPS2 default: vsync ON */
+#else
+	option_vsync = 0;   /* MVS/NCDZ default: vsync OFF (perf) */
+#endif
 	option_showfps = 0;
 	option_sound_enable = 1;
 	option_samplerate = 2;
 	option_sound_volume = 10;
-	option_stretch = 0;
+	option_stretch = 0;	/* original default: stretch to fill screen */
 	show_frames_each_second = 0;
 #if defined(BUILD_NCDZ)
 	option_mp3_enable = 1;
 	option_mp3_volume = 10;
 #endif
 
+	// Default control mapping P1_* -> PLATFORM_PAD_*. Previously guarded by
+	// #if defined(NO_GUI); the GUI/menu builds need this too, otherwise
+	// input_map[] stays all-zero and the core never sees any button presses.
 #if defined(BUILD_MVS) || defined(BUILD_NCDZ) || defined(BUILD_CPS1) || defined(BUILD_CPS2)
 	input_map[P1_UP] = PLATFORM_PAD_UP;
 	input_map[P1_DOWN] = PLATFORM_PAD_DOWN;
 	input_map[P1_LEFT] = PLATFORM_PAD_LEFT;
 	input_map[P1_RIGHT] = PLATFORM_PAD_RIGHT;
 #if defined(BUILD_MVS) || defined(BUILD_NCDZ)
-	input_map[P1_BUTTONA] = PLATFORM_PAD_B1;
+	/* Default button order: A/B/C/D -> Square / Cross / Triangle / Circle */
+	input_map[P1_BUTTONA] = PLATFORM_PAD_B3;
 	input_map[P1_BUTTONB] = PLATFORM_PAD_B2;
-	input_map[P1_BUTTONC] = PLATFORM_PAD_B3;
-	input_map[P1_BUTTOND] = PLATFORM_PAD_B4;
+	input_map[P1_BUTTONC] = PLATFORM_PAD_B4;
+	input_map[P1_BUTTOND] = PLATFORM_PAD_B1;
 	input_map[P1_START] = PLATFORM_PAD_START;
 #if defined(BUILD_MVS)
 	input_map[P1_COIN] = PLATFORM_PAD_SELECT;
@@ -484,15 +529,15 @@ int main(int argc, char *argv[]) {
 #endif
 #endif
 #if defined(BUILD_CPS1) || defined(BUILD_CPS2)
-	input_map[P1_BUTTON1] = PLATFORM_PAD_B1;
+	/* Default button order: 1/2/3/4 -> Square / Cross / Triangle / Circle */
+	input_map[P1_BUTTON1] = PLATFORM_PAD_B3;
 	input_map[P1_BUTTON2] = PLATFORM_PAD_B2;
-	input_map[P1_BUTTON3] = PLATFORM_PAD_B3;
-	input_map[P1_BUTTON4] = PLATFORM_PAD_B4;
+	input_map[P1_BUTTON3] = PLATFORM_PAD_B4;
+	input_map[P1_BUTTON4] = PLATFORM_PAD_B1;
 	input_map[P1_DIAL_L] = PLATFORM_PAD_L;
 	input_map[P1_DIAL_R] = PLATFORM_PAD_R;
 	input_map[P1_START] = PLATFORM_PAD_START;
 	input_map[P1_COIN] = PLATFORM_PAD_SELECT;
-#endif
 #endif
 #endif
 

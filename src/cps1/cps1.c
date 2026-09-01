@@ -216,9 +216,14 @@ static void cps1_run(void)
 			}
 			
 			apply_cheat(); //davex cheat
+			/* Input before CPU (SNESticleRevive order): the pad snapshot
+			 * taken now is what this frame's emulation sees, instead of
+			 * the previous frame's late sample. */
+			update_inputport();
 			timer_update_cpu();
 			update_screen();
-			update_inputport();
+
+			global_frame_count++;
 
 			// printf("Frame: %u\n", global_frame_count++);
 			// if (global_frame_count == 685) {

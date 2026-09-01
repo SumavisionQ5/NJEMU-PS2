@@ -1357,6 +1357,8 @@ static void cps1_render_layer(int layer)
 
 void cps1_screenrefresh(void)
 {
+	extern uint32_t frames_displayed;
+	frames_displayed++; /* new frame: advance the tile-cache age counter */
 	int i, l0, l1, l2, l3;
 	uint16_t video_ctrl = cps1_port(CPS1_VIDEO_CONTROL);
 	uint16_t layer_ctrl = cps1_port(driver->layer_control);

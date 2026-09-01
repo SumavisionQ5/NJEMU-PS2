@@ -82,6 +82,8 @@ static bool desktop_chSRCReserve(void *data, uint16_t samples, int32_t frequency
     }
     
     SDL_PauseAudioDevice(desktop->device, 0);
+    printf("AUDIO_RESERVE OK freq=%d ch=%d samples=%d (obtained freq=%d)\n",
+        frequency, channels, samples, obtained.freq);
     return true;
 }
 
@@ -152,9 +154,20 @@ static void desktop_srcOutputBlocking(void *data, int32_t volume, void *buffer, 
         free(out_buffer);
     }
 
+    /* DEBUG: sample counter (dummy driver never consumes, so skip waiting) */
+    {
+        static uint64_t aud_cnt = 0, aud_bytes = 0;
+        aud_cnt++; aud_bytes += size;
+        if ((aud_cnt % 120) == 0)
+            printf("AUDIO_OUT cnt=%llu bytes=%llu queued=%u\n",
+                (unsigned long long)aud_cnt, (unsigned long long)aud_bytes,
+                SDL_GetQueuedAudioSize(desktop->device));
+    }
     /* Wait if too much audio is queued to prevent runaway buffering */
-    while (SDL_GetQueuedAudioSize(desktop->device) > size * 8) {
-        SDL_Delay(1);
+    if (strcmp(SDL_GetCurrentAudioDriver(), "dummy") != 0) {
+        while (SDL_GetQueuedAudioSize(desktop->device) > size * 8) {
+            SDL_Delay(1);
+        }
     }
 }
 

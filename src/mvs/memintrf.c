@@ -1184,27 +1184,56 @@ static int load_rom_user1(int reload)
 
 	bios_amask = memory_length_user1 - 1;
 
-	if (patch)
-	{
-		uint16_t *mem16 = (uint16_t *)memory_region_user1;
-		uint16_t value;
-
-		if (!neogeo_region)
-			value = mem16[0x00400 >> 1] & 0x03;
-		else
-			value = neogeo_region - 1;
-
-		if (!neogeo_machine_mode)
-			value |= mem16[0x00400 >> 1] & 0x8000;
-		else
-			value |= (neogeo_machine_mode - 1) ? 0x8000 : 0;
-
-		mem16[0x00400 >> 1] = value;
-		mem16[(patch + 0) >> 1] = 0x4e71;
-		mem16[(patch + 2) >> 1] = 0x4e71;
-	}
+	neogeo_bios_patch_addr = patch;
+	neogeo_apply_bios_patch();
 
 	return 1;
+}
+
+
+/*--------------------------------------------------------
+	BIOS region / machine-mode patch
+
+	The NeoGeo BIOS holds its region byte at $C00400.  The PSP build
+	applies the user's Region / Machine Mode settings by patching that
+	byte (and NOP-ing out the BIOS region-check code) once, while loading
+	the BIOS in load_rom_user1().  The PS2 port's "Reset Game" only calls
+	neogeo_reset() (CPU/video/sound state reset, NO BIOS reload), so a
+	Region changed in the in-game Settings menu never took effect on
+	reset.  Extracting the patch here lets neogeo_reset() re-apply it to
+	the already-loaded BIOS in memory.
+--------------------------------------------------------*/
+
+uint32_t neogeo_bios_patch_addr = 0;
+
+void neogeo_apply_bios_patch(void)
+{
+	uint16_t *mem16;
+	uint16_t value;
+
+	/* BIOSes that need no region-check patch (and the irrmaze special
+	 * case) leave the address at 0: the Region setting then has no
+	 * effect, exactly like the PSP build. */
+	if (!neogeo_bios_patch_addr)
+		return;
+	if (!memory_region_user1)
+		return;
+
+	mem16 = (uint16_t *)memory_region_user1;
+
+	if (!neogeo_region)
+		value = mem16[0x00400 >> 1] & 0x03;
+	else
+		value = neogeo_region - 1;
+
+	if (!neogeo_machine_mode)
+		value |= mem16[0x00400 >> 1] & 0x8000;
+	else
+		value |= (neogeo_machine_mode - 1) ? 0x8000 : 0;
+
+	mem16[0x00400 >> 1] = value;
+	mem16[(neogeo_bios_patch_addr + 0) >> 1] = 0x4e71;
+	mem16[(neogeo_bios_patch_addr + 2) >> 1] = 0x4e71;
 }
 
 /*--------------------------------------------------------

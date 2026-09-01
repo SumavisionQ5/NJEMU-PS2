@@ -28,6 +28,12 @@ extern int neogeo_bios;
 extern int neogeo_region;
 extern int neogeo_save_sound_flag;
 
+/* Re-apply the BIOS region / machine-mode patch to the loaded BIOS
+ * (defined in memintrf.c).  Called by neogeo_reset() so a Region change
+ * from the in-game Settings menu takes effect on "Reset Game". */
+extern uint32_t neogeo_bios_patch_addr;
+void neogeo_apply_bios_patch(void);
+
 enum TEXTURE_LAYER_INDEX {
 	TEXTURE_LAYER_SPR0,
 	TEXTURE_LAYER_SPR1,
