@@ -326,9 +326,15 @@ void ui_init(void)
 #define LIST_X 28
 #define LIST_Y 42
 #define LINE_H 10
-/* 15 rows fit inside the panel on 224-line menus too (15th row ends at
- * y=192, panel bottom is 200, bottom hint at 210). */
+/* Visible rows per page. 224-line menus (CPS1/CPS2) fit 15 rows (15th
+ * ends at y=192, panel bottom 200, bottom hint 210). 240-line menus
+ * (MVS/NCDZ) have room for 17 rows (17th ends at y=212, panel bottom
+ * 216, bottom hint 226). */
+#if (EMU_SYSTEM == MVS) || (EMU_SYSTEM == NCDZ)
+#define VISIBLE 17
+#else
 #define VISIBLE 15
+#endif
 
 typedef enum { E_DIR = 0, E_UP, E_QUIT, E_FILE } entry_type;
 

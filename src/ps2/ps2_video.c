@@ -812,8 +812,14 @@ void ps2_video_switch_menu_mode(void)
 	gsKit_mode_switch(gsGlobal, GS_ONESHOT);
 	gsKit_clear(gsGlobal, GS_BLACK);
 
+#ifndef NO_GUI
+	/* Only the GUI build links ps2_gui.c (which provides this); the
+	 * no-GUI build (NO_GUI=ON, the CMake default) must not reference it
+	 * or the link fails with "undefined reference to
+	 * ui_menu_texture_reset". */
 	extern void ui_menu_texture_reset(void);
 	ui_menu_texture_reset();
+#endif
 
 	ps2_flipScreen(ps2, true);
 	boot_log("[MM] menu mode 480i");

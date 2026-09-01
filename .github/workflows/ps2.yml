@@ -13,16 +13,16 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.target }} LARGE_MEMORY=${{ matrix.large_memory }} COMMAND_LIST=${{ matrix.command_list }} ADHOC=${{ matrix.adhoc }} SAVE_STATE=${{ matrix.save_state }} NO_GUI=${{ matrix.no_gui }}
+    name: ${{ matrix.target }} LARGE_MEMORY=${{ matrix.large_memory }} COMMAND_LIST=${{ matrix.command_list }} ADHOC=${{ matrix.adhoc }} SAVE_STATE=${{ matrix.save_state }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [MVS, NCDZ, CPS1, CPS2] 
+        target: [MVS, NCDZ, CPS1, CPS2]
         large_memory: [OFF] #TODO: ON
         command_list: [OFF] #TODO: ON
         adhoc: [OFF] #TODO: ON
         save_state: [OFF] #TODO: OFF
-        no_gui: [ON] #TODO: OFF
+        # Always the GUI build (NO_GUI=OFF); the no-GUI build was dropped.
         exclude:
           - target: NCDZ
             adhoc: ON
@@ -38,13 +38,14 @@ jobs:
       run: |
         apk add build-base git bash cmake
 
-    - name: Compile project
+    - name: Compile project (GUI build)
       run: |
         mkdir build
         cd build
         cmake -DPLATFORM="PS2" \
           -DCMAKE_TOOLCHAIN_FILE=$PS2DEV/share/ps2dev.cmake \
           -DTARGET="${{ matrix.target }}" \
+          -DNO_GUI=OFF \
           -DLARGE_MEMORY=${{ matrix.large_memory }} \
           -DCOMMAND_LIST=${{ matrix.command_list }} \
           -DADHOC=${{ matrix.adhoc }} \
