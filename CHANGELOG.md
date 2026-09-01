@@ -265,22 +265,6 @@ iterative debugging work is omitted.
 
 ## Menu / UI
 
-### ROMSET databases rebuilt from latest FBNeo drivers
-- `zipname.*` and `rominfo.*` for CPS1 / CPS2 / MVS were regenerated from
-  the 2026-04-08 FBNeo sources (`d_cps1.cpp` / `d_cps2.cpp` /
-  `d_neogeo.cpp`):
-  - zipname entries: CPS1 217 → 438, CPS2 286 → 373, MVS 312 → 673
-    (every FBNeo game incl. clones/alts/regions, with BOOTLEG/HACK tags).
-  - rominfo entries keep NJEMU's proven region/offset/type/group/skip
-    layout while ROM names/CRCs/lengths are updated to the current FBNeo
-    set (most CRCs identical to the old data — same hardware ROMs, new
-    FBNeo filenames). CPS1 171/244, CPS2 283/286, MVS 281/311 games
-    updated; the rest keep their old entries.
-  - Conversion tools: `parse_fbneo.py` + `gen_data.py`.
-- Games present only in FBNeo still need NJEMU driver code (driver.c /
-  inptport.c are compiled into the ELF); they are listed in zipname but
-  cannot run from rominfo alone yet.
-
 ### PS2 settings menu (mirrors the PSP option set, per-system)
 - In-game menu gained a "Settings" entry (per PSP options):
   - CPS1: Raster Effects, Rotate Screen, Video Sync, Auto Frameskip,
