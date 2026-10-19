@@ -10,6 +10,9 @@
 #include "common/emulator_options.h"
 #include "common/video_driver.h"
 #include "common/video_geometry.h"
+#include "common/display_mode.h"
+#include "ps2/ps2_video_filter_policy.h"
+#include "ps2/ps2_native_240p_policy.h"
 #include <string.h>
 
 #include <stdlib.h>
@@ -142,9 +145,33 @@ static const ps2_output_mode_t *ps2_output_mode_at(int index)
 	return &ps2_output_modes[ps2_sanitize_output_mode(index)];
 }
 
+#if (EMU_SYSTEM == CPS1 || EMU_SYSTEM == CPS2)
+/* A native 384x224 GS scanout avoids fractional source-pixel stretching.
+ * 5:6 derives from the 704-wide NTSC raster's 10:22 pixel aspect. */
+static const ps2_output_mode_t ps2_cps_native_240p_mode = {
+	GS_MODE_NTSC, PS2_CPS_NATIVE_WIDTH, PS2_CPS_NATIVE_HEIGHT,
+	GS_NONINTERLACED, GS_FRAME, 5, 6
+};
+#endif
+
+static const ps2_output_mode_t *ps2_output_mode_for_display(
+	int output_mode, int display_mode)
+{
+#if (EMU_SYSTEM == CPS1 || EMU_SYSTEM == CPS2)
+	if (ps2_use_native_cps_240p(1,
+		output_mode == VIDEO_OUTPUT_240P,
+		display_mode == DISPLAY_MODE_NATIVE_PIXELS))
+		return &ps2_cps_native_240p_mode;
+#else
+	(void)display_mode;
+#endif
+	return ps2_output_mode_at(output_mode);
+}
+
 static const ps2_output_mode_t *ps2_selected_output_mode(void)
 {
-	return ps2_output_mode_at(option_video_output_mode);
+	return ps2_output_mode_for_display(option_video_output_mode,
+		option_display_mode);
 }
 
 typedef struct texture_layer {
@@ -1311,10 +1338,11 @@ static void ps2_transferWorkFrame(void *data, RECT *src_rect, RECT *dst_rect)
 	int src_height = src_rect->bottom - src_rect->top;
 	int dst_width = dst_rect->right - dst_rect->left;
 	int dst_height = dst_rect->bottom - dst_rect->top;
-	int integer_upscale = src_width > 0 && src_height > 0 &&
-		dst_width >= src_width && dst_height >= src_height &&
-		(dst_width % src_width) == 0 && (dst_height % src_height) == 0;
-	int filter = integer_upscale ? GS_FILTER_NEAREST : GS_FILTER_LINEAR;
+	int output_is_240p = ps2->gsGlobal->Mode == GS_MODE_NTSC &&
+		ps2->gsGlobal->Interlace == GS_NONINTERLACED;
+	int filter = ps2_presentation_uses_nearest_filter(output_is_240p,
+		src_width, src_height, dst_width, dst_height) ?
+		GS_FILTER_NEAREST : GS_FILTER_LINEAR;
 
 	uint8_t textureVertexCount = 2;
 	GSPRIMUVPOINTFLAT textureVertex[textureVertexCount];
@@ -1330,10 +1358,9 @@ static void ps2_transferWorkFrame(void *data, RECT *src_rect, RECT *dst_rect)
 	ps2->gsGlobal->PrimAlphaEnable = GS_SETTING_OFF;
 
 	gsKit_renderToScreen(ps2->gsGlobal);
-	/* Preserve exact texel sampling for pixel-accurate 1:1 and integer-upscaled
-	 * presentation, but filter fractional scaling. Fractional nearest-neighbour
-	 * scaling makes moving source pixels alternate between uneven destination
-	 * widths, which appears as shimmer during scrolling. */
+	/* On 240p output, use sharp texel sampling even when the physical
+	 * non-square pixel aspect requires fractional horizontal scaling.
+	 * Other modes retain linear filtering for fractional presentation. */
 	gsKit_set_texfilter(ps2->gsGlobal, filter);
 	gskit_prim_list_sprite_texture_uv_flat_color2(ps2->gsGlobal, ps2->scrbitmap, ps2->vertexColor, textureVertexCount, textureVertex);
 	ps2->gsGlobal->PrimAlphaEnable = prev_alpha;
@@ -1947,7 +1974,8 @@ static void ps2_restore_output_vram_contents(ps2_video_t *ps2)
 	ps2->currentTexclut.specification.cov = 0xFF;
 }
 
-static int ps2_apply_output_mode(ps2_video_t *ps2, int mode_index)
+static int ps2_apply_output_mode(ps2_video_t *ps2, int mode_index,
+	int display_mode)
 {
 	GSGLOBAL *gsGlobal;
 	const ps2_output_mode_t *output_mode;
@@ -1957,7 +1985,7 @@ static int ps2_apply_output_mode(ps2_video_t *ps2, int mode_index)
 		return 0;
 
 	mode_index = ps2_sanitize_output_mode(mode_index);
-	output_mode = ps2_output_mode_at(mode_index);
+	output_mode = ps2_output_mode_for_display(mode_index, display_mode);
 	gsGlobal = ps2->gsGlobal;
 
 	/* Finish every command that still references the old VRAM map before
@@ -2031,22 +2059,31 @@ static int ps2_setOutputMode(void *data, int mode_index)
 {
 	ps2_video_t *ps2 = (ps2_video_t *)data;
 	int old_mode;
+	int old_native;
+	const ps2_output_mode_t *requested;
 
 	if (!ps2)
 		return 0;
 	mode_index = ps2_sanitize_output_mode(mode_index);
-	if (mode_index == ps2->output_mode && ps2->output_mode_valid) {
+	requested = ps2_output_mode_for_display(mode_index, option_display_mode);
+	if (mode_index == ps2->output_mode && ps2->output_mode_valid &&
+		ps2->gsGlobal->Width == requested->width &&
+		ps2->gsGlobal->Height == requested->height) {
 		ps2_setOutputOffset(ps2, option_video_offset_x, option_video_offset_y);
 		return 1;
 	}
 
 	old_mode = ps2->output_mode;
-	if (ps2_apply_output_mode(ps2, mode_index))
+	old_native = ps2->gsGlobal->Width == PS2_CPS_NATIVE_WIDTH &&
+		ps2->gsGlobal->Height == PS2_CPS_NATIVE_HEIGHT &&
+		old_mode == VIDEO_OUTPUT_240P;
+	if (ps2_apply_output_mode(ps2, mode_index, option_display_mode))
 		return 1;
 
 	/* A larger mode can exhaust GS VRAM. Restore the last known-good layout
 	 * so the caller can keep running and revert the setting cleanly. */
-	(void)ps2_apply_output_mode(ps2, old_mode);
+	(void)ps2_apply_output_mode(ps2, old_mode,
+		old_native ? DISPLAY_MODE_NATIVE_PIXELS : DISPLAY_MODE_ORIGINAL_ASPECT);
 	return 0;
 }
 

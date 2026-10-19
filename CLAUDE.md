@@ -35,6 +35,11 @@ For PSP use the PSPSDK CMake toolchain (`$PSPDEV/psp/share/pspdev.cmake`). Run
 executables from their build/resource context when relative resource paths are
 needed.
 
+Authoring utilities must be implemented in portable C99 and integrated with
+`tools/host/njemu-tool` where possible. Avoid new Swift or Python scripts.
+The optional PNG artwork authoring command uses host libpng; its prebuilt
+outputs are checked in so emulator builds have no new image-tool dependency.
+
 Useful options include:
 
 - `GUI=ON/OFF`;
@@ -63,6 +68,9 @@ Useful options include:
 - `PSP_ME_SOUND_PROFILE=ON/OFF` (PSP MVS-only 68000/Z80/scheduler and sound
   protocol timing log for the full ME sound-coprocessor work; default OFF;
   pair with `PSP_AUDIO_PROFILE` for YM2610/producer/ME-wait timing);
+- `PSP_ME_DIAGNOSTIC_LOG=ON/OFF` (PSP CPS2/MVS/NCDZ ME diagnostic files;
+  default OFF and forced OFF in canonical releases; no periodic file operations
+  or log formatting when disabled);
 - `PSP_ME_RING_SELFTEST=ON/OFF` (PSP MVS + `PSP_ME_AUDIO=ON` only; default OFF;
   runs the synthetic Allegrex/ME shared-ring transport oracle at startup and
   builds the standalone `psp_me_ring_hardware_test` PRX for psplink validation);

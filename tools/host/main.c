@@ -12,7 +12,11 @@ typedef struct command_entry {
 } command_entry_t;
 
 static const command_entry_t commands[] = {
+#ifdef NJEMU_HAS_PNG_ARTWORK
+    {"artwork", command_artwork, "generate PSP/Vita PNG artwork from per-core sources"},
+#endif
     {"dip-metadata", command_dip_metadata, "validate/build localized DIP metadata"},
+    {"elf-footprint", command_elf_footprint, "measure and compare ELF allocated sections"},
     {"font", command_font, "validate/build the external GBK font asset"},
     {"game-database", command_game_database, "validate/build the unified CPS2 game database"},
     {"game-metadata", command_game_metadata, "validate/build runtime game metadata"},
@@ -21,6 +25,8 @@ static const command_entry_t commands[] = {
     {"translations", command_translations, "validate/build runtime translations"},
     {"validate-cps2-cache", command_validate_cps2_cache, "validate CPS2 converter cache layouts"},
     {"compare-frames", command_compare_frames, "compare Desktop PPM frame dumps"},
+    {"release-notes", command_release_notes, "generate release notes from a Git commit range"},
+    {"stats-snapshot", command_stats_snapshot, "archive GitHub release downloads and optional traffic"},
 };
 
 static void print_usage(const char *program)

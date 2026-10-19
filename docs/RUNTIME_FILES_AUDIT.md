@@ -560,6 +560,9 @@ Therefore:
 
 - `processed/` is the canonical location;
 - `cache/` is a migration compatibility path, not a second canonical source;
+- canonical PSP/PS2 releases with `USE_CACHE=ON` include an empty `cache/`
+  directory as a compatibility hint alongside `processed/`, while Desktop
+  and Vita resident MVS releases use `processed/` only;
 - it must not be removed until installations using the legacy layout have a
   documented migration path;
 - duplicated processed assets in both roots are unnecessary once migration is
@@ -698,8 +701,9 @@ Runtime assets live beside the executable according to the common
 
 ### PSP
 
-`data/<core>.png` is used by CMake as the EBOOT/PBP icon. It is a
-build-time/package asset and is not opened by NJEMU at runtime.
+`data/artwork/<core>/icon_144_80.png` is packaged by CMake as the EBOOT/PBP
+icon, alongside `pic0_480_272.png` and `pic1_480_272.png` as the XMB overlay
+and background. These are build-time assets, not opened by NJEMU at runtime.
 
 PSP system/network modules loaded by the executable are platform facilities,
 not files distributed from this repository.
@@ -833,8 +837,8 @@ layout.
 ### Legacy SystemButtons file
 
 `data/SystemButtons/SystemButtons.prx` was a historical PSP 2.3.x support
-module. The current source has no loader for it, CMake only consumes
-`data/<core>.png` from the top-level `data/` tree, and no package/install
+module. The current source has no loader for it; CMake consumes
+only artwork under `data/artwork/<core>/` for PSP/Vita packages, and no package/install
 rule references the module. Git attributes and sparse-checkout state add no
 special ownership requirement.
 
@@ -888,7 +892,7 @@ Platform overlays:
 | Item | Desktop | PSP | PS2 | PS Vita |
 | --- | --- | --- | --- | --- |
 | Common launchDir tree | M | M | M | M in `ux0:data/<target>/` |
-| `data/<core>.png` | -- | B: PBP icon | -- | -- |
+| `data/artwork/<core>/` | -- | B: PBP icon, overlay and background | -- | B: VPK LiveArea images |
 | External ps2_drivers image set | -- | -- | C: external-image build only | -- |
 | Embedded GXP shader blobs | -- | -- | -- | compiled into executable |
 | Vita diagnostic log/dump files | -- | -- | -- | O/debug |

@@ -146,6 +146,7 @@ if(NJEMU_CANONICAL_RELEASE)
     endif()
     set(PSP_AUDIO_PROFILE OFF CACHE BOOL "PSP: log audio producer/chip/output timing" FORCE)
     set(PSP_ME_SOUND_PROFILE OFF CACHE BOOL "PSP MVS: log 68000/Z80/scheduler/sound-island timing" FORCE)
+    set(PSP_ME_DIAGNOSTIC_LOG OFF CACHE BOOL "PSP: write periodic CPS2/Neo Geo ME diagnostic logs" FORCE)
     set(PSP_ME_RING_SELFTEST OFF CACHE BOOL "PSP MVS: run the synthetic ME shared-ring self-test" FORCE)
     set(CACHE_IO_PROFILE OFF CACHE BOOL "Profile MVS cache I/O" FORCE)
     set(CACHE_IO_FORCE_SEEK OFF CACHE BOOL "Force legacy seek-before-read MVS cache behavior" FORCE)
@@ -414,10 +415,15 @@ set(VERSION_MAJOR ${NJEMU_VERSION_MAJOR})
 set(VERSION_MINOR ${NJEMU_VERSION_MINOR})
 set(VERSION_BUILD ${NJEMU_VERSION_PATCH})
 set(VERSION_STR "${NJEMU_DISPLAY_VERSION}")
+set(NJEMU_RUNTIME_BUILD_ID "${NJEMU_DISPLAY_VERSION}")
+if(PLATFORM STREQUAL "PSP")
+    set(VERSION_STR "${NJEMU_RELEASE_VERSION}")
+endif()
 add_definitions(-DVERSION_MAJOR=${VERSION_MAJOR})
 add_definitions(-DVERSION_MINOR=${VERSION_MINOR})
 add_definitions(-DVERSION_BUILD=${VERSION_BUILD})
 add_definitions(-DVERSION_STR="${VERSION_STR}")
+add_definitions(-DNJEMU_RUNTIME_BUILD_ID="${NJEMU_RUNTIME_BUILD_ID}")
 add_definitions(-DNJEMU_GIT_SHA="${NJEMU_GIT_SHA}")
 message(STATUS "NJEMU version: ${NJEMU_DISPLAY_VERSION} [artifact ${NJEMU_VERSION}; ${NJEMU_VERSION_SOURCE}]")
 
@@ -670,12 +676,19 @@ set(COMMON_SRC ${COMMON_SRC}
     common/icon/${ICON_PREFIX}_l.c
 )
 
+option(NJEMU_EXTERNAL_MENU_ICONS "Experimental external category icon pack" OFF)
 if (NOT GUI)
     set(COMMON_SRC ${COMMON_SRC}
         common/no_gui.c
     )
 else()
     # Interactive GUI sources.
+    if (NJEMU_EXTERNAL_MENU_ICONS)
+        set(COMMON_SRC ${COMMON_SRC} common/icon/menu_extra_external.c)
+        add_compile_definitions(NJEMU_EXTERNAL_MENU_ICONS=1)
+    else()
+        set(COMMON_SRC ${COMMON_SRC} common/icon/menu_extra.c)
+    endif()
     set(COMMON_SRC ${COMMON_SRC}
         common/ui.c
         common/ui_menu.c
@@ -993,6 +1006,7 @@ add_custom_command(
         ${UI_EXTRA_UNICODE_ARGS}
     DEPENDS
         ${NJEMU_HOST_TOOL_TARGET}
+        "${NJEMU_HOST_TOOL}"
         ${UI_EXTRA_UNICODE_DEPENDS}
         "${CMAKE_SOURCE_DIR}/src/common/font/gbk_tbl.c"
         "${CMAKE_SOURCE_DIR}/translations/messages.def"
@@ -1179,9 +1193,13 @@ elseif("${TARGET}" STREQUAL "CPS2")
     endif()
 elseif("${TARGET}" STREQUAL "MVS")
     # processed/ is canonical even for full-resident builds because encrypted
-    # sets may require offline-converted C/S/V data. cache/ remains only a
-    # compatibility fallback for existing USE_CACHE installs.
+    # sets may require offline-converted C/S/V data. Cached builds also accept
+    # cache/ as a legacy processed-asset location; expose that compatibility
+    # directory only when the fallback is actually compiled in.
     list(APPEND NJEMU_RUNTIME_DATA_DIRS processed memcard nvram)
+    if(USE_CACHE)
+        list(APPEND NJEMU_RUNTIME_DATA_DIRS cache)
+    endif()
 elseif("${TARGET}" STREQUAL "NCDZ")
     if(GUI)
         list(APPEND NJEMU_RUNTIME_DATA_DIRS data)
@@ -1475,6 +1493,7 @@ endif()
 # Create the VPK for PS Vita: the executable, the target resources and the
 # translation packs, laid out like the install tree of the other platforms.
 if(PLATFORM STREQUAL "PSVITA")
+    include("${CMAKE_SOURCE_DIR}/cmake/NJEMUArtworkValidation.cmake")
     # Title IDs: NJMU0000n, one per target so they can be installed side by side
     set(VITA_TITLEID_CPS1 "NJMU00003")
     set(VITA_TITLEID_CPS2 "NJMU00004")
@@ -1533,6 +1552,16 @@ if(PLATFORM STREQUAL "PSVITA")
     # a runtime asset in both configurations.
     list(APPEND VITA_VPK_FILE_ARGS FILE "${GBK_FONT_ASSET}" "font/gbk_s14.bin")
 
+    set(VITA_ARTWORK_DIR "${CMAKE_SOURCE_DIR}/data/artwork/${TARGET_LOWER}")
+    list(APPEND VITA_VPK_FILE_ARGS
+        FILE "${VITA_ARTWORK_DIR}/icon_128_128.png" "sce_sys/icon0.png"
+        FILE "${VITA_ARTWORK_DIR}/pic0_960_544.png" "sce_sys/pic0.png"
+        FILE "${VITA_ARTWORK_DIR}/bg_840_500.png" "sce_sys/livearea/contents/bg0.png"
+        FILE "${VITA_ARTWORK_DIR}/startup_280_158.png" "sce_sys/livearea/contents/startup.png")
+    list(APPEND VITA_VPK_FILE_ARGS
+        FILE "${CMAKE_SOURCE_DIR}/data/artwork/template.xml"
+             "sce_sys/livearea/contents/template.xml")
+
     # Room after the text segment for the SCE module data that vita-elf-create
     # appends (vitasdk/vita-toolchain#303): recent binutils may place the data
     # segment right behind it.
@@ -1548,17 +1577,17 @@ endif()
 
 # Create the PBP file for PSP
 if(PLATFORM STREQUAL "PSP")
+    include("${CMAKE_SOURCE_DIR}/cmake/NJEMUArtworkValidation.cmake")
     set(BUILD_PRX ON)
-    set(PSP_EBOOT_ICON "${CMAKE_SOURCE_DIR}/data/${TARGET_LOWER}.png")
+    set(PSP_ARTWORK_DIR "${CMAKE_SOURCE_DIR}/data/artwork/${TARGET_LOWER}")
     create_pbp_file(
         TARGET ${TARGET}
-        ICON_PATH "${PSP_EBOOT_ICON}"
-        BACKGROUND_PATH NULL
-        PREVIEW_PATH NULL
+        ICON_PATH "${PSP_ARTWORK_DIR}/icon_144_80.png"
+        BACKGROUND_PATH "${PSP_ARTWORK_DIR}/pic1_480_272.png"
+        PREVIEW_PATH "${PSP_ARTWORK_DIR}/pic0_480_272.png"
         # PSPSDK's create_pbp_file() forwards TITLE through a shell command.
-        # Keep this metadata shell-safe; the runtime still shows the canonical
-        # parenthesized display version (for example, 2.4.0 (88138190)).
-        TITLE "${TARGET} ${NJEMU_RELEASE_VERSION} build ${NJEMU_BUILD_NUMBER} for PSP"
+        # Keep XMB metadata concise; build identity remains in the binary.
+        TITLE "NJEMU ${TARGET} ${NJEMU_RELEASE_VERSION}"
         # PARAM.SFO's application version remains the SDK-friendly numeric
         # major/minor pair; the title/runtime version carries the human-readable
         # release version and commit build number.
@@ -1569,10 +1598,31 @@ if(PLATFORM STREQUAL "PSP")
 endif()
 
 if(BUILD_TESTING AND PLATFORM STREQUAL "DESKTOP")
+    add_test(NAME elf_footprint_host_tests
+        COMMAND "${NJEMU_HOST_TEST}"
+            --source-dir "${CMAKE_CURRENT_SOURCE_DIR}"
+            --scratch-dir "${CMAKE_BINARY_DIR}/generated/host-tests/elf"
+            --suite elf)
     add_test(NAME version_derivation_tests
         COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NJEMUVersionTests.cmake)
+    add_test(NAME platform_artwork_tests
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NJEMUArtworkValidation.cmake)
     add_test(NAME release_packaging_tests
         COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NJEMUReleasePackageTests.cmake)
+    find_program(NJEMU_BASH_EXECUTABLE bash)
+    if(NJEMU_BASH_EXECUTABLE)
+        add_test(NAME release_parallel_build_tests
+            COMMAND "${NJEMU_BASH_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/release_parallel_build_tests.sh")
+    endif()
+    add_test(NAME web_version_generation_tests
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NJEMUWebVersionTests.cmake)
+
+    add_executable(cache_format_version_tests tests/cache_format_version_tests.c)
+    target_include_directories(cache_format_version_tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_compile_options(cache_format_version_tests PRIVATE ${WARNING_OPTIONS})
+    add_test(NAME cache_format_version_tests COMMAND cache_format_version_tests)
 
     add_executable(audio_producer_job_tests
         tests/audio_producer_job_tests.c
@@ -1881,6 +1931,61 @@ if(BUILD_TESTING AND PLATFORM STREQUAL "DESKTOP")
     )
     add_test(NAME ui_layout_tests COMMAND ui_layout_tests)
 
+    add_executable(menu_icon_tests
+        tests/menu_icon_tests.c
+        src/common/icon/menu_extra.c
+    )
+    target_include_directories(menu_icon_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    add_test(NAME menu_icon_tests COMMAND menu_icon_tests)
+
+    add_executable(menu_icon_pack_tool
+        tools/menu_icon_pack.c
+        src/common/icon/menu_extra.c
+    )
+    target_include_directories(menu_icon_pack_tool PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    add_library(menu_icon_embedded_oracle OBJECT src/common/icon/menu_extra.c)
+    target_include_directories(menu_icon_embedded_oracle PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_compile_definitions(menu_icon_embedded_oracle PRIVATE
+        menu_icon_small_get=embedded_small_get
+        menu_icon_large_get=embedded_large_get
+    )
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/menu_icons_test.bin
+        COMMAND $<TARGET_FILE:menu_icon_pack_tool> ${CMAKE_CURRENT_BINARY_DIR}/menu_icons_test.bin
+        DEPENDS menu_icon_pack_tool
+        VERBATIM
+    )
+    add_custom_target(menu_icon_pack_test_data
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/menu_icons_test.bin
+    )
+    add_executable(menu_icon_pack_tests
+        tests/menu_icon_pack_tests.c
+        src/common/icon/menu_extra_external.c
+        $<TARGET_OBJECTS:menu_icon_embedded_oracle>
+    )
+    target_compile_definitions(menu_icon_pack_tests PRIVATE NJEMU_EXTERNAL_MENU_ICONS=1)
+    target_include_directories(menu_icon_pack_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    add_dependencies(menu_icon_pack_tests menu_icon_pack_test_data)
+    add_test(NAME menu_icon_pack_tests
+        COMMAND menu_icon_pack_tests ${CMAKE_CURRENT_BINARY_DIR}/menu_icons_test.bin
+    )
+
+    add_executable(menu_section_rules_tests
+        tests/menu_section_rules_tests.c
+    )
+    target_include_directories(menu_section_rules_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    add_test(NAME menu_section_rules_tests COMMAND menu_section_rules_tests)
+
     add_executable(ui_texture_layout_tests
         tests/ui_texture_layout_tests.c
     )
@@ -1984,6 +2089,13 @@ if(BUILD_TESTING AND PLATFORM STREQUAL "DESKTOP")
 		${CMAKE_CURRENT_SOURCE_DIR}/src
 	)
 	add_test(NAME input_state_tests COMMAND input_state_tests)
+
+	add_executable(ps2_issue15_tests
+		tests/ps2_issue15_tests.c
+		src/common/input_state.c)
+	target_include_directories(ps2_issue15_tests PRIVATE
+		${CMAKE_CURRENT_SOURCE_DIR}/src)
+	add_test(NAME ps2_issue15_tests COMMAND ps2_issue15_tests)
 
 	add_executable(cps_orientation_tests
 		tests/cps_orientation_tests.c
