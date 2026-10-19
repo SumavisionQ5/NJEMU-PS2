@@ -72,6 +72,13 @@ uint8_t *memory_region_user1;
 uint8_t *memory_region_user2;
 
 uint32_t memory_length_cpu1;
+/* CPS1 68K program ROM window.
+   Classic sets fit 0x200000, but a few bootlegs (captcm*, sf2rk2, sf2amf6,
+   sf2ceuab2/ucbl, ...) carry a larger 68K program. The region itself is
+   allocated from the rominfo REGION size, so only this decode boundary
+   has to follow it. 0x200000..0x7FFFFF is unused by the CPS1 I/O decode
+   (which starts at 0x800000), so widening cannot collide with anything. */
+static uint32_t cpu1_window = 0x200000;
 uint32_t memory_length_cpu2;
 uint32_t memory_length_gfx1;
 uint32_t memory_length_sound1;
@@ -142,6 +149,9 @@ static int load_rom_cpu1(void)
 		return 0;
 	}
 	memset(memory_region_cpu1, 0, memory_length_cpu1);
+	/* follow the rominfo REGION size, never shrinking below the classic
+	   0x200000 window (a set with no CPU1 region leaves memory_length_cpu1 0) */
+	cpu1_window = (memory_length_cpu1 > 0x200000) ? memory_length_cpu1 : 0x200000;
 
 	parent = strlen(parent_name) ? parent_name : NULL;
 
@@ -790,7 +800,8 @@ uint8_t m68000_read_memory_8(uint32_t offset)
 
 	offset &= M68K_AMASK;
 
-	if (offset < 0x200000)
+	//if (offset < 0x200000)
+	if (offset < cpu1_window)
 	{
 		return READ_BYTE(memory_region_cpu1, offset);
 	}
@@ -883,7 +894,8 @@ uint16_t m68000_read_memory_16(uint32_t offset)
 {
 	offset &= M68K_AMASK;
 
-	if (offset < 0x200000)
+	//if (offset < 0x200000)
+	if (offset < cpu1_window)
 	{
 		return READ_WORD(memory_region_cpu1, offset);
 	}
