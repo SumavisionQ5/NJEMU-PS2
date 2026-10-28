@@ -219,6 +219,26 @@ if(USE_CACHE AND "${TARGET}" STREQUAL "MVS")
 else()
     add_definitions(-DMVS_PCM_CACHE=0)
 endif()
+# MVS widescreen profiles (resources/mvs/widescreen) patch the game program for
+# a 16:9 view, which the Desktop canvas and the PSP and Vita screens can show.
+if("${TARGET}" STREQUAL "MVS" AND
+   (PLATFORM STREQUAL "DESKTOP" OR PLATFORM STREQUAL "PSP" OR PLATFORM STREQUAL "PSVITA"))
+    set(MVS_WIDESCREEN ON)
+    add_definitions(-DMVS_WIDESCREEN=1)
+else()
+    set(MVS_WIDESCREEN OFF)
+    add_definitions(-DMVS_WIDESCREEN=0)
+endif()
+# CPS1/CPS2 widescreen profiles (resources/cps1|cps2/widescreen) do the same
+# for a 480x224 view, which fits the 480-pixel work frame of every backend.
+if(("${TARGET}" STREQUAL "CPS1" OR "${TARGET}" STREQUAL "CPS2") AND
+   (PLATFORM STREQUAL "DESKTOP" OR PLATFORM STREQUAL "PSP" OR PLATFORM STREQUAL "PSVITA"))
+    set(CPS_WIDESCREEN ON)
+    add_definitions(-DCPS_WIDESCREEN=1)
+else()
+    set(CPS_WIDESCREEN OFF)
+    add_definitions(-DCPS_WIDESCREEN=0)
+endif()
 
 option(CACHE_IO_PROFILE "Profile MVS cache I/O" OFF)
 option(CACHE_IO_FORCE_SEEK "Force legacy seek-before-read MVS cache behavior" OFF)
@@ -633,6 +653,8 @@ if (COMMAND_LIST)
     set(COMMON_SRC ${COMMON_SRC}
         common/cmdlist.h
         common/cmdlist.c
+        common/command_data.h
+        common/command_data.c
     )
 endif()
 
@@ -791,6 +813,13 @@ if (${TARGET} STREQUAL "MVS")
         mvs/sprite_common.h
         mvs/sprite_common.c
         mvs/sprite.c
+        mvs/wide.h
+        mvs/wide.c
+        common/wide_profile.h
+        common/wide_profile.c
+        mvs/wide_debug.h
+        mvs/wide_debug.c
+        mvs/wide_runtime.c
         mvs/pd4990a.h
         mvs/pd4990a.c
         mvs/neocrypt.c
@@ -832,6 +861,10 @@ if (${TARGET} STREQUAL "CPS1")
         cps1/eeprom.h
         cps1/eeprom.c
         cps1/kabuki.c
+        cps1/wide.h
+        cps1/wide.c
+        common/wide_profile.h
+        common/wide_profile.c
     )
 
     # Set SOUND_2151 flag for CPS1
@@ -864,6 +897,10 @@ if (${TARGET} STREQUAL "CPS2")
         cps2/sprite.c
         cps2/eeprom.h
         cps2/eeprom.c
+        cps2/wide.h
+        cps2/wide.c
+        common/wide_profile.h
+        common/wide_profile.c
     )
 
     # Set SOUND_QSOUND flag for CPS2
@@ -979,6 +1016,11 @@ set_source_files_properties(
 set(GAME_METADATA_SOURCE "${CMAKE_SOURCE_DIR}/metadata/${TARGET_LOWER}.tsv")
 set(UI_EXTRA_UNICODE_ARGS --unicode-source "${GAME_METADATA_SOURCE}")
 set(UI_EXTRA_UNICODE_DEPENDS "${GAME_METADATA_SOURCE}")
+if(COMMAND_LIST)
+    set(COMMAND_UNICODE_SOURCE "${CMAKE_SOURCE_DIR}/metadata/command_list_unicode.txt")
+    list(APPEND UI_EXTRA_UNICODE_ARGS --unicode-source "${COMMAND_UNICODE_SOURCE}")
+    list(APPEND UI_EXTRA_UNICODE_DEPENDS "${COMMAND_UNICODE_SOURCE}")
+endif()
 if("${TARGET}" STREQUAL "CPS1" OR "${TARGET}" STREQUAL "MVS")
     set(DIP_METADATA_SOURCE "${CMAKE_SOURCE_DIR}/metadata/${TARGET_LOWER}_dips.json")
     list(APPEND UI_EXTRA_UNICODE_ARGS --unicode-source "${DIP_METADATA_SOURCE}")
@@ -1156,11 +1198,29 @@ if("${TARGET}" STREQUAL "CPS1")
     list(APPEND NJEMU_DISTRIBUTED_RESOURCE_FILES
         rominfo.cps1
     )
+    if(CPS_WIDESCREEN)
+        list(APPEND NJEMU_DISTRIBUTED_RESOURCE_FILES
+            widescreen/sf2.ini
+            widescreen/sf2ce.ini
+        )
+    endif()
 elseif("${TARGET}" STREQUAL "CPS2")
+    if(CPS_WIDESCREEN)
+        list(APPEND NJEMU_DISTRIBUTED_RESOURCE_FILES
+            widescreen/sfa.ini
+        )
+    endif()
 elseif("${TARGET}" STREQUAL "MVS")
     list(APPEND NJEMU_DISTRIBUTED_RESOURCE_FILES
         rominfo.mvs
     )
+    if(MVS_WIDESCREEN)
+        list(APPEND NJEMU_DISTRIBUTED_RESOURCE_FILES
+            widescreen/kof96.ini
+            widescreen/kof98.ini
+            widescreen/mslug3.ini
+        )
+    endif()
 endif()
 
 foreach(NJEMU_RESOURCE_FILE IN LISTS NJEMU_DISTRIBUTED_RESOURCE_FILES)
@@ -1242,13 +1302,22 @@ if(COMMAND_LIST)
 endif()
 if("${TARGET}" STREQUAL "CPS1")
     list(APPEND NJEMU_BUILD_RESOURCE_ENTRIES nvram)
+    if(CPS_WIDESCREEN)
+        list(APPEND NJEMU_BUILD_RESOURCE_ENTRIES widescreen)
+    endif()
 elseif("${TARGET}" STREQUAL "CPS2")
     list(APPEND NJEMU_BUILD_RESOURCE_ENTRIES nvram)
+    if(CPS_WIDESCREEN)
+        list(APPEND NJEMU_BUILD_RESOURCE_ENTRIES widescreen)
+    endif()
     if(USE_CACHE)
         list(APPEND NJEMU_BUILD_RESOURCE_ENTRIES cache)
     endif()
 elseif("${TARGET}" STREQUAL "MVS")
     list(APPEND NJEMU_BUILD_RESOURCE_ENTRIES processed memcard nvram)
+    if(MVS_WIDESCREEN)
+        list(APPEND NJEMU_BUILD_RESOURCE_ENTRIES widescreen)
+    endif()
     if(USE_CACHE)
         list(APPEND NJEMU_BUILD_RESOURCE_ENTRIES cache)
     endif()
@@ -1259,6 +1328,8 @@ elseif("${TARGET}" STREQUAL "NCDZ")
     endif()
 endif()
 list(REMOVE_DUPLICATES NJEMU_BUILD_RESOURCE_ENTRIES)
+# Files inside a directory (widescreen/) are staged through that directory.
+list(FILTER NJEMU_BUILD_RESOURCE_ENTRIES EXCLUDE REGEX "/")
 
 # COPY_RESOURCES makes the explicit development staging set self-contained on
 # platforms where symlinks are problematic; it does not broaden the set.
@@ -1598,6 +1669,41 @@ if(PLATFORM STREQUAL "PSP")
 endif()
 
 if(BUILD_TESTING AND PLATFORM STREQUAL "DESKTOP")
+    add_executable(desktop_gamepad_tests
+        tests/desktop_gamepad_tests.c
+        src/desktop/desktop_input.c
+        src/common/input_state.c)
+    target_include_directories(desktop_gamepad_tests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src" ${SDL2_INCLUDE_DIRS})
+    target_link_libraries(desktop_gamepad_tests PRIVATE ${NJEMU_SDL2_TARGET})
+    target_compile_options(desktop_gamepad_tests PRIVATE ${WARNING_OPTIONS})
+    add_test(NAME desktop_gamepad_tests COMMAND desktop_gamepad_tests)
+    set_tests_properties(desktop_gamepad_tests PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy")
+
+    if("${TARGET}" STREQUAL "NCDZ")
+        add_executable(mp3_stop_tests tests/mp3_stop_tests.c)
+        target_include_directories(mp3_stop_tests PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src"
+            "${LIBMAD_INCLUDE_DIR}")
+        target_link_libraries(mp3_stop_tests PRIVATE ${LIBMAD_LIBRARY})
+        target_compile_options(mp3_stop_tests PRIVATE ${WARNING_OPTIONS})
+        add_test(NAME mp3_stop_tests COMMAND mp3_stop_tests)
+        set_tests_properties(mp3_stop_tests PROPERTIES TIMEOUT 10)
+
+        add_executable(ps2_cdda_ring_tests
+            tests/ps2_cdda_ring_tests.c
+            src/ps2/ps2_audio.c
+            src/ps2/ps2_audio_submit.c)
+        target_include_directories(ps2_cdda_ring_tests BEFORE PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/ps2_audio_stubs"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src")
+        target_compile_options(ps2_cdda_ring_tests PRIVATE ${WARNING_OPTIONS})
+        add_test(NAME ps2_cdda_ring_tests COMMAND ps2_cdda_ring_tests)
+        set_tests_properties(ps2_cdda_ring_tests PROPERTIES TIMEOUT 10)
+    endif()
+
     add_test(NAME elf_footprint_host_tests
         COMMAND "${NJEMU_HOST_TEST}"
             --source-dir "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -1789,7 +1895,8 @@ if(BUILD_TESTING AND PLATFORM STREQUAL "DESKTOP")
             add_executable(mvs_sprite_upload_${UPLOAD_MODE}_tests
                 tests/mvs_sprite_upload_tests.c
                 src/mvs/sprite.c
-                src/mvs/sprite_common.c)
+                src/mvs/sprite_common.c
+                src/mvs/wide.c)
             target_include_directories(mvs_sprite_upload_${UPLOAD_MODE}_tests PRIVATE
                 ${CMAKE_CURRENT_SOURCE_DIR}/src)
             # The test follows the selected build capability. In no-cache builds it
@@ -1804,6 +1911,69 @@ if(BUILD_TESTING AND PLATFORM STREQUAL "DESKTOP")
                 COMMAND mvs_sprite_upload_${UPLOAD_MODE}_tests)
         endforeach()
     endif()
+
+    add_executable(desktop_presentation_tests
+        tests/desktop_presentation_tests.c
+        src/desktop/desktop_video.c
+        src/desktop/desktop_frame_dump.c
+    )
+    target_include_directories(desktop_presentation_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src ${SDL2_INCLUDE_DIRS}
+    )
+    target_compile_definitions(desktop_presentation_tests PRIVATE
+        BUILD_${TARGET} DESKTOP
+    )
+    target_link_libraries(desktop_presentation_tests PRIVATE ${NJEMU_SDL2_TARGET})
+    add_test(NAME desktop_presentation_tests COMMAND desktop_presentation_tests)
+    set_tests_properties(desktop_presentation_tests PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software;NJEMU_DUMP_FRAMES="
+    )
+
+    # Exercise the PSP-specific lazy profile lifecycle on the host with mock
+    # ROM/profile services, including repeated off/on/off transitions.
+    if("${TARGET}" STREQUAL "MVS" OR "${TARGET}" STREQUAL "CPS1" OR "${TARGET}" STREQUAL "CPS2")
+        string(TOLOWER "${TARGET}" PSP_WIDE_TEST_TARGET)
+        set(PSP_WIDE_TEST_SRC
+            tests/psp_wide_lazy_tests.c
+            src/${PSP_WIDE_TEST_TARGET}/wide.c)
+        if("${TARGET}" STREQUAL "MVS")
+            list(APPEND PSP_WIDE_TEST_SRC src/mvs/wide_runtime.c)
+        endif()
+        add_executable(psp_wide_lazy_tests ${PSP_WIDE_TEST_SRC})
+        target_include_directories(psp_wide_lazy_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_compile_definitions(psp_wide_lazy_tests PRIVATE
+            PSP=1 RELEASE=1 MVS_WIDESCREEN=1 CPS_WIDESCREEN=1 TEST_${TARGET}=1)
+        # GUI is a directory-wide definition; these PSP-mock tests have no UI.
+        target_compile_options(psp_wide_lazy_tests PRIVATE -UGUI)
+        add_test(NAME psp_wide_lazy_tests COMMAND psp_wide_lazy_tests)
+    endif()
+
+    if(${TARGET} STREQUAL "MVS")
+        add_executable(mvs_wide_tests
+            tests/mvs_wide_tests.c
+            src/mvs/wide.c
+            src/common/wide_profile.c
+        )
+        target_include_directories(mvs_wide_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+        )
+        add_test(NAME mvs_wide_tests COMMAND mvs_wide_tests)
+        target_compile_definitions(mvs_wide_tests PRIVATE
+            TEST_PROFILE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/mvs/widescreen"
+        )
+        find_package(Python3 COMPONENTS Interpreter)
+        if(Python3_Interpreter_FOUND)
+            add_test(NAME widescreen_tool_tests
+                COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/widescreen_tool_tests.py
+                    --runtime-validator $<TARGET_FILE:mvs_wide_tests>
+            )
+            set_tests_properties(widescreen_tool_tests PROPERTIES
+                ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1"
+            )
+        endif()
+    endif()
+
     if(${TARGET} STREQUAL "NCDZ")
         find_package(Threads REQUIRED)
         add_executable(psp_me_sound_worker_ncdz_tests
@@ -1887,6 +2057,14 @@ if(BUILD_TESTING AND PLATFORM STREQUAL "DESKTOP")
         ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     add_test(NAME frame_pacing_tests COMMAND frame_pacing_tests)
+
+    add_executable(game_pacing_defaults_tests
+        tests/game_pacing_defaults_tests.c
+    )
+    target_include_directories(game_pacing_defaults_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    add_test(NAME game_pacing_defaults_tests COMMAND game_pacing_defaults_tests)
 
     add_executable(auto_frameskip_tests
         tests/auto_frameskip_tests.c
@@ -2024,6 +2202,16 @@ if(BUILD_TESTING AND PLATFORM STREQUAL "DESKTOP")
         ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     add_test(NAME ui_utf8_tests COMMAND ui_utf8_tests)
+
+    add_executable(command_data_tests
+        tests/command_data_tests.c
+        src/common/command_data.c
+        src/common/ui_utf8.c
+    )
+    target_include_directories(command_data_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    add_test(NAME command_data_tests COMMAND command_data_tests)
 
     if(GUI)
         add_executable(font_runtime_tests
@@ -2181,8 +2369,12 @@ endif()
 # assets, caches and runtime-generated data that must never enter an install
 # output by accident.
 foreach(NJEMU_RESOURCE_FILE IN LISTS NJEMU_DISTRIBUTED_RESOURCE_FILES)
+    get_filename_component(NJEMU_RESOURCE_SUBDIR "${NJEMU_RESOURCE_FILE}" DIRECTORY)
+    if(NJEMU_RESOURCE_SUBDIR STREQUAL "")
+        set(NJEMU_RESOURCE_SUBDIR .)
+    endif()
     install(FILES "${RESOURCE_DIR}${NJEMU_RESOURCE_FILE}"
-        DESTINATION .
+        DESTINATION "${NJEMU_RESOURCE_SUBDIR}"
     )
 endforeach()
 if(DEFINED GAMELIST_OUTPUT)

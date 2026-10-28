@@ -16,6 +16,71 @@ This guide contains the detailed usage, controls, ROM setup, compatibility, and 
 
 > **Menu shortcut:** press START+SELECT during gameplay to open the emulator menu on every platform.
 
+### Video Sync and Frame Limit
+
+The **Video Settings** menu stores VSync (`VideoSync`) and Frame Limit
+(`60FPSLimit`) separately for each game in `config/<game>.ini`.
+
+| Platform | Default VSync | Default Frame Limit |
+| --- | --- | --- |
+| PSP and PS2 (all four cores) | On | Off |
+| Desktop and PS Vita (CPS2) | On | On |
+| Desktop and PS Vita (CPS1, MVS, NCDZ) | Off | On |
+
+PSP and PS2 normally synchronize framebuffer swaps with the display's VBlank
+instead of adding a separate software sleep. This avoids tearing from
+unsynchronized flips, but the physical display refresh (~60 Hz) is not exactly
+the native CPS2/MVS/NCDZ arcade frame rate. Slow frames can still miss a VBlank
+and lower the effective emulation speed. Change either option for a specific
+game if needed; **existing per-game configuration files keep their saved
+values**. Only new or missing game configurations use these defaults.
+
+Frame Limit applies to software pacing at the selected arcade core's native
+frame rate (despite its historical `60FPSLimit` filename). Auto Frame Skip and
+manual Frame Skip are independent settings and both default to Off.
+PSP Ad Hoc multiplayer intentionally overrides several per-game options while
+connected, including VSync Off and Frame Limit On, to preserve its existing
+network synchronization policy.
+
+### Desktop Controllers (macOS, Linux and Steam Deck)
+
+Desktop NJEMU supports SDL2-compatible gamepads using SDL's standard
+GameController mappings, including Xbox-style and PlayStation controllers.
+Controllers can be plugged in or disconnected while NJEMU is running. The
+keyboard remains usable without a gamepad and, by default, shares player one
+with the first connected gamepad. Additional gamepads operate players two and
+onward in multiplayer-capable games.
+
+The Desktop **Emulation Settings > Player 1 Input** option is saved in the
+application INI as `Player1Input`:
+
+| Value | Player 1 | Additional players |
+|-------|----------|-------------------|
+| `0` (default) | Keyboard and first controller together | Second controller onwards |
+| `1` | Keyboard only | First controller becomes P2 |
+| `2` | First controller only | Second controller onwards |
+
+Controller-only falls back to keyboard when no gamepad is connected, so the
+menu remains usable after disconnecting the last controller. Source selection
+can be changed while NJEMU is running.
+
+| Control | Keyboard | Gamepad |
+|---------|----------|---------|
+| Directions | Arrow keys | D-pad or left analog stick |
+| Circle (B1) | Z | B / Circle |
+| Cross (B2) | X | A / Cross |
+| Square (B3) | C | X / Square |
+| Triangle (B4) | S | Y / Triangle |
+| L / R | A / D | Left / right shoulder |
+| Start | Return | Start / Options |
+| Select | Space | Back / Share |
+| Exit Desktop application | Escape | Close the application window |
+
+The emulator menu opens with **Start + Select**. On Steam Deck, the usual
+Steam Input gamepad layout should be enabled. For controllers not recognized
+by SDL2, provide a standard SDL game-controller mapping; raw, unmapped HID
+joysticks do not automatically provide the face-button layout.
+
 ### In-Game Controls
 
 Button layouts automatically flip/rotate when:
@@ -151,6 +216,51 @@ NJEMU does not intercept PSP system buttons. HOME is left to the firmware and
 uses the standard PSP exit callback; VOL +/- are likewise left entirely to the
 firmware so the normal system volume behavior/overlay can be used.
 
+### Optional Command Lists (`command.dat`)
+
+NJEMU can display game instructions, special moves, and button/direction
+combinations supplied in the MAME Plus! `command.dat` format. **This file is
+optional, user-supplied data**: it is not part of NJEMU downloads, and the
+emulator runs games normally when it is absent.
+
+1. Obtain a compatible file. One public example is the
+   [MAME Plus! 0.168 command archive](https://e2j.net/files/command_0.168.zip).
+   Extract **`command.dat`** from the ZIP; do not copy the ZIP itself.
+2. Copy `command.dat` to the selected core's runtime root, alongside the
+   emulator's other per-core files, **not** inside `roms/`:
+
+   A single `command.dat` can contain commands for thousands of games. You
+   only need one file in each emulator core's directory, not one per ROM.
+
+   | Platform | Example location |
+   | --- | --- |
+   | PSP | `/PSP/GAME/MVSPSP/command.dat` (or `CPS1PSP`, `CPS2PSP`, `NCDZPSP`) |
+   | PS2 | `command.dat` in the core's launch working directory (which may depend on the ELF/HDD launcher) |
+   | PS Vita | `ux0:data/mvs/command.dat` (or the matching `cps1`, `cps2`, `ncdz` data directory) |
+   | Desktop | `command.dat` in the current working directory from which NJEMU is launched |
+
+3. Launch a game. During gameplay press **Start + Select** to open the emulator
+   menu, then select **Command List**. If the file is absent or has no entry
+   for that game, NJEMU reports that the list is unavailable.
+
+The command-list feature is compiled into official release packages.
+Developer builds may disable it with `-DCOMMAND_LIST=OFF`; copying a data file
+cannot enable a feature omitted at compile time.
+
+The MAME Plus! 0.168 file includes **UTF-8 Japanese** text. Full UTF-8 parsing
+and the additional Japanese font mapping require a NJEMU build that includes
+the [issue #24 fix](https://github.com/fjtrujy/NJEMU/pull/26); older tagged
+versions may show unreadable characters. Supported input formats include
+Latin-1, GBK, and UTF-8, with only legacy fallback rendering for Shift-JIS.
+Command direction/button markers are interpreted as controller icons.
+
+The file browser can also offer an optional **size-reduction** operation when
+selecting `command.dat`. This creates a `command.org` backup and filters out
+game sections not relevant to the current core. It is not required to use
+Command List, and should not be confused with opening the list during gameplay.
+For the technical format, font coverage, and RAM improvements, see
+[COMMAND_LIST_UTF8.md](COMMAND_LIST_UTF8.md).
+
 #### AdHoc Mode
 
 Ad Hoc is a PSP/MVS-only optional build capability. When that capability is
@@ -267,7 +377,7 @@ ROM file names inside the ZIP can be anything, but **CRC values must match** MAM
 
 | System | Supported Games | Notes |
 |--------|-----------------|-------|
-| **CPS1** | 137 sets | Street Fighter II, Final Fight, Ghouls'n Ghosts, etc. |
+| **CPS1** | 138 sets | Street Fighter II, Final Fight, Ghouls'n Ghosts, etc. |
 | **CPS2** | 286 sets | Including Phoenix Edition decrypted sets |
 | **MVS** | 305 sets | Including bootlegs and homebrew |
 | **NCDZ** | All official releases | All officially released Neo-Geo CD games |

@@ -736,7 +736,7 @@ ps2_drivers.irximg
 
 Classification:
 
-- `BOOT.ELF`: platform launcher/bootstrap;
+- `BOOT.ELF`: universal storage launcher/bootstrap for USB, MX4SIO and internal HDD;
 - `elf_path.ini`: generated platform bootstrap configuration;
 - `ps2_drivers.irximg`: platform support image;
 - `<core>`: NJEMU executable.

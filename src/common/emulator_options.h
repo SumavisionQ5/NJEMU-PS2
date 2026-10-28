@@ -13,8 +13,19 @@ extern int option_video_output_mode;
 extern int option_video_offset_x;
 extern int option_video_offset_y;
 extern int option_video_backend;
+extern int option_video_filter;
 extern int option_cache_read_size;
 extern int option_audio_processor;
+/* Desktop-only P1 physical-input source. Stored in the application INI. */
+extern int option_desktop_p1_input;
+
+enum
+{
+	DESKTOP_P1_INPUT_BOTH = 0,
+	DESKTOP_P1_INPUT_KEYBOARD,
+	DESKTOP_P1_INPUT_CONTROLLER,
+	DESKTOP_P1_INPUT_COUNT
+};
 
 #define FPS_OVERLAY_OFFSET_MAX 96
 #define VIDEO_OUTPUT_OFFSET_MAX 64
@@ -33,6 +44,16 @@ enum
 	VIDEO_BACKEND_NATIVE,
 	VIDEO_BACKEND_OPENGL,
 	VIDEO_BACKEND_COUNT
+};
+
+/* Presentation filters applied when the frame is scaled onto the display. */
+enum
+{
+	VIDEO_FILTER_NONE = 0,
+	VIDEO_FILTER_CRT,
+	VIDEO_FILTER_CRT_BLEEDING,
+	VIDEO_FILTER_CRT_BLEEDING_FLAT,
+	VIDEO_FILTER_COUNT
 };
 
 enum

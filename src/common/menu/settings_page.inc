@@ -7,9 +7,13 @@ enum menu_setting_kind {
     SETTING_TOGGLE,
     SETTING_OFFSET,
     SETTING_VIDEO_BACKEND,
+    SETTING_VIDEO_FILTER,
     SETTING_VIDEO_OUTPUT,
     SETTING_AUDIO_PROCESSOR,
     SETTING_CACHE_SIZE,
+#ifdef DESKTOP
+    SETTING_DESKTOP_P1_INPUT,
+#endif
     SETTING_DIP,
     SETTING_CHEAT
 };
@@ -95,8 +99,22 @@ static const char *menu_setting_text(const menu_setting_row_t *row,
         return buffer;
     case SETTING_VIDEO_BACKEND:
         return video_backend_choice_at(value).name;
+    case SETTING_VIDEO_FILTER: {
+        static const char *const filters[VIDEO_FILTER_COUNT] = {
+            NULL, "CRT", "CRT Bleeding", "CRT Bleeding Flat"
+        };
+        return value == VIDEO_FILTER_NONE ? TEXT(OFF) : filters[value];
+    }
     case SETTING_VIDEO_OUTPUT:
         return TEXT(modes[value]);
+#ifdef DESKTOP
+    case SETTING_DESKTOP_P1_INPUT: {
+        static const char *const sources[DESKTOP_P1_INPUT_COUNT] = {
+            "Keyboard + Pad", "Keyboard only", "Controller only"
+        };
+        return sources[value];
+    }
+#endif
     case SETTING_AUDIO_PROCESSOR:
 #ifdef PSP_ME_AUDIO
         return TEXT(processors[value]);
@@ -139,9 +157,13 @@ static int menu_settings_page(int section, int title, int icon)
     int fps_x_before = option_fps_offset_x;
     int fps_y_before = option_fps_offset_y;
     int backend_before = option_video_backend;
+    int filter_before = option_video_filter;
     int processor_before = option_audio_processor;
     int cache_before = option_cache_read_size;
     int output_mode_before = option_video_output_mode;
+#ifdef DESKTOP
+    int p1_input_before = option_desktop_p1_input;
+#endif
     gamecfg_t gamecfg[GAMECFG_MAX_ITEMS];
     gamecfg2_t *gamecfg2 = NULL;
     menu_setting_row_t *items = calloc((size_t)capacity, sizeof(*items));
@@ -204,6 +226,10 @@ static int menu_settings_page(int section, int title, int icon)
             menu_setting_add(items, &count, SETTING_VIDEO_BACKEND, VIDEO_BACKEND,
                              &option_video_backend, 0, video_backend_choice_count() - 1);
         }
+        if (video_filter_count() > 1) {
+            menu_setting_add(items, &count, SETTING_VIDEO_FILTER, VIDEO_FILTER,
+                             &option_video_filter, VIDEO_FILTER_NONE, video_filter_count() - 1);
+        }
 #ifdef PS2
         menu_setting_add(items, &count, SETTING_VIDEO_OUTPUT, VIDEO_OUTPUT_MODE,
                          &option_video_output_mode, VIDEO_OUTPUT_240P, VIDEO_OUTPUT_480P);
@@ -223,6 +249,12 @@ static int menu_settings_page(int section, int title, int icon)
                          &option_cache_read_size, CACHE_READ_SIZE_AUTO, CACHE_READ_SIZE_64K);
 #endif
     } else if (section == MENU_CFG_EMULATION) {
+#ifdef DESKTOP
+        menu_setting_add(items, &count, SETTING_DESKTOP_P1_INPUT, CONTROLLER,
+                         &option_desktop_p1_input, DESKTOP_P1_INPUT_BOTH,
+                         DESKTOP_P1_INPUT_CONTROLLER);
+        items[count - 1].label = "Player 1 Input";
+#endif
 #if (EMU_SYSTEM == CPS1)
         dipswitch = load_dipswitch(&sx);
 #elif (EMU_SYSTEM == MVS)
@@ -431,7 +463,11 @@ static int menu_settings_page(int section, int title, int icon)
         output_x_before != option_video_offset_x || output_y_before != option_video_offset_y ||
         output_mode_before != option_video_output_mode ||
         backend_before != option_video_backend || processor_before != option_audio_processor ||
-        cache_before != option_cache_read_size)
+        cache_before != option_cache_read_size || filter_before != option_video_filter
+#ifdef DESKTOP
+        || p1_input_before != option_desktop_p1_input
+#endif
+        )
         save_settings();
     if (backend_before != option_video_backend || processor_before != option_audio_processor ||
         cache_before != option_cache_read_size)
