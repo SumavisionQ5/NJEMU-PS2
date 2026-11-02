@@ -164,16 +164,18 @@ if(NJEMU_CANONICAL_RELEASE)
         set(USE_DESKTOP_GL ON CACHE BOOL "Desktop: compile the OpenGL 3.3 video backend alongside SDL" FORCE)
     endif()
 
-    # PS2 downloadable CPS2/MVS builds are the fully featured cached variants:
-    # use accelerated cache I/O and the external ps2_drivers IRX image/bootstrap.
-    # CPS1/NCDZ do not use the streaming cache and keep the directly launchable
-    # classic embedded-driver ELF layout.
-    if(PLATFORM STREQUAL "PS2" AND USE_CACHE)
-        set(PS2_FAST_CACHE ON CACHE BOOL "PS2: enable accelerated cache I/O for cached cores" FORCE)
+    # Every canonical PS2 core needs the same universal storage bootstrap,
+    # including uncached CPS1/NCDZ on ATA-backed FAT/exFAT internal HDDs.
+    # Cache I/O acceleration remains exclusive to cached CPS2/MVS builds.
+    if(PLATFORM STREQUAL "PS2")
         set(PS2_EXTERNAL_IRX_IMAGE ON CACHE BOOL "PS2: load ps2_drivers IRXs from an external image" FORCE)
     else()
-        set(PS2_FAST_CACHE OFF CACHE BOOL "PS2: enable accelerated cache I/O for cached cores" FORCE)
         set(PS2_EXTERNAL_IRX_IMAGE OFF CACHE BOOL "PS2: load ps2_drivers IRXs from an external image" FORCE)
+    endif()
+    if(PLATFORM STREQUAL "PS2" AND USE_CACHE)
+        set(PS2_FAST_CACHE ON CACHE BOOL "PS2: enable accelerated cache I/O for cached cores" FORCE)
+    else()
+        set(PS2_FAST_CACHE OFF CACHE BOOL "PS2: enable accelerated cache I/O for cached cores" FORCE)
     endif()
 
     if(PLATFORM STREQUAL "PS2" AND "${TARGET}" STREQUAL "MVS")
@@ -2284,6 +2286,11 @@ if(BUILD_TESTING AND PLATFORM STREQUAL "DESKTOP")
 	target_include_directories(ps2_issue15_tests PRIVATE
 		${CMAKE_CURRENT_SOURCE_DIR}/src)
 	add_test(NAME ps2_issue15_tests COMMAND ps2_issue15_tests)
+	add_executable(ps2_launch_storage_tests
+		tests/ps2_launch_storage_tests.c)
+	target_include_directories(ps2_launch_storage_tests PRIVATE
+		${CMAKE_CURRENT_SOURCE_DIR}/src)
+	add_test(NAME ps2_launch_storage_tests COMMAND ps2_launch_storage_tests)
 
 	add_executable(cps_orientation_tests
 		tests/cps_orientation_tests.c

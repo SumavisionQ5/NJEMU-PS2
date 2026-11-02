@@ -1,15 +1,125 @@
-# PS2 internal HDD boot (issue #23)
+# PS2 internal HDD boot (issues #23 and #29)
+
+## Internal exFAT HDD through wLaunchELF-R3Z (issue #29)
+
+The same universal `BOOT.ELF` also handles exFAT partitions on the internal
+HDD exposed by wLaunchELF-R3Z 4.80 as `ata0:/` or `ata1:/`. The bootstrap
+restores the ATA/BDM transport, discovers the canonical `massN:/` mount and
+passes `--ps2-drivers-ata-bdm` to the extensionless NJEMU executable. ATA
+volume numbers are not assumed to correspond to `massN` numbers; ambiguous
+mount discovery fails instead of selecting an arbitrary volume.
+
+NJEMU captures that marker and the current `massN:/` directory **before its
+own IOP reset**. It stages ATA/BDM rather than the generic USB/MX4SIO or
+APA/PFS driver set, and restores the exact launch directory afterward through
+`ps2_ata_bdm_launch_restore()`. The ATA-backed BDM driver must never be staged
+together with APA/PFS `ps2atad`. Audio and controller drivers are staged as
+usual, and FAST CACHE acceleration is not requested for ATA/BDM. The core's
+normal ROM/cache policy is unaffected.
+
+Place `BOOT.ELF`, the `CPS1`, `CPS2`, `MVS` or `NCDZ` executable, `elf_path.ini` naming that
+executable, `ps2_drivers.irximg`, and the regular release assets together in
+the exFAT directory. Launch **`BOOT.ELF` from R3Z**, not the core executable.
+No `BOOT_ATA.ELF` or separate HDD bootstrap is needed.
+
+**All four canonical PS2 cores use this same layout.** Earlier releases used
+directly launchable `CPS1.ELF` and `NCDZ.ELF` binaries, which could not use
+the universal bootstrap's ATA/BDM transport handoff. This explains the
+real-hardware report on issue #29: CPS2/MVS booted from R3Z while CPS1/NCDZ
+returned to the browser after a black screen. The new canonical package
+routes the uncached cores through `BOOT.ELF` without enabling their streaming
+cache or changing ordinary standalone development builds.
+
+This integration depends on `ps2_drivers/njemu` at or after merge
+`d89375cb` (PR #30). Earlier installed bootstraps do not support the R3Z
+handoff. A user has confirmed CPS2 and MVS booting through R3Z on a real PS2;
+CPS1 and NCDZ need another physical-console test with the updated all-core
+bootstrap package. Keep issue #29 open until that validation is complete.
+
+### CPS1/NCDZ follow-up to issue #29
+
+The reported black-screen-then-browser behavior only affected CPS1 and NCDZ.
+They were the two canonical PS2 cores still distributed as standalone
+`CPS1.ELF` / `NCDZ.ELF` binaries. Their embedded-driver startup could not
+recover the R3Z ATA/BDM filesystem through the universal bootstrap. The
+canonical build and release checks now require the **same external-IRX
+`BOOT.ELF` layout for all four cores**. This does not turn on streaming
+cache or FAST CACHE for CPS1/NCDZ and does not affect ordinary, noncanonical
+standalone developer builds.
+
+In PCSX2 2.9.146, the actual wLaunchELF-R3Z 4.80 launched
+`ata0:/BOOT.ELF` from separate clones of the existing isolated exFAT disk,
+once with `elf_path.ini = CPS1`, once with `elf_path.ini = NCDZ`. Both runs:
+
+- Translated `ata0:/` to `mass0:/` through the universal bootstrap.
+- Loaded the correct extensionless core and captured the ATA/BDM launch
+  marker before the core's own IOP reset.
+- Recovered the filesystem and initialized the PS2 video backend instead of
+  returning to wLaunchELF.
+
+All four canonical GCC PS2 cores built with the same bootstrap, and the
+release-packaging tests and ZIP checks require identical `BOOT.ELF` files,
+the corresponding `elf_path.ini` and `ps2_drivers.irximg`, with no stale
+direct ELF or bundled ROM. This confirms the launch/initialization fix in
+PCSX2; CPS1/NCDZ gameplay and physical PS2 behavior are not yet verified.
+
+### NJEMU exFAT validation (PCSX2)
+
+The real wLaunchELF-R3Z 4.80 executable auto-launched `ata0:/BOOT.ELF` on
+PCSX2 2.9.146 using a **cloned, isolated 1 GiB MBR/exFAT image**. The original
+image, user HDD, and source ROMs were not altered. The bootstrap recovered
+the filesystem as `mass0:/`, loaded NJEMU without another IOP reset, and
+forwarded the transport marker to each core.
+
+- **MVS / Windjammers:** NJEMU captured `mass0:/`, staged its ATA/BDM and
+  application IRXs, reset its IOP, restored exFAT, detected the Neo Geo BIOS
+  and `wjammers` ROM set, and finished game and audio initialization. An
+  existing saved BIOS-selection config was copied into the isolated image to
+  avoid a controller-dependent first-boot prompt.
+- **CPS2 / Alien vs. Predator:** The same launch sequence detected `avsp`,
+  loaded ROM members from the exFAT disk, initialized the 16 MiB graphics
+  cache, and completed PS2 audio initialization.
+- The host-side `ps2_launch_storage_tests` cover the explicit marker on
+  `mass1:/`, APA/PFS selection, unmarked USB/MX4SIO paths, and absent cwd.
+
+Both runs used the updated universal bootstrap, with SHA-256
+`5c4e5b3a55618129727b33b219fbd22b9d1ab91454bee450118d773981f4afae`.
+The tests establish application/game loading, not real-device behavior or
+long-duration reliability. `ata1:/`, multiple ambiguous devices and physical
+PS2 launches still need explicit validation.
+
+### Fresh USB and APA/PFS regression checks
+
+With the same updated bootstrap and NJEMU source, PCSX2 2.9.146 also passed:
+
+- **USB FAT32, MVS / Windjammers:** A cloned 256 MiB USB image booted through
+  `mass0:/UNIVERSAL_TEST/BOOT.ELF`. The bootstrap detected live USB (not ATA),
+  NJEMU survived its own IOP reset, and the BIOS, ROM set and audio loaded.
+  PCSX2 reported `ohci_die: DMA error` during USB startup, as in the previous
+  baseline, but game initialization succeeded.
+- **APA/PFS HDD, MVS / Windjammers:** A cloned 8 GiB HDD image booted through
+  the existing PFS wLaunchELF handoff. NJEMU preserved `hdd0:__common`,
+  restored PFS after its own reset, and finished ROM and audio loading.
+
+The host launch-selection test and release-packaging tests passed, as did
+canonical GCC builds of CPS1, CPS2, MVS and NCDZ. A real canonical PS2 ZIP
+was produced and verified to contain identical MVS/CPS2 universal bootstraps,
+the correct `elf_path.ini` files and the external IRX images, without ROMs.
+LLVM compilation of the changed PS2 platform source succeeded, but the full
+LLVM build remains blocked by unrelated compiler/linker object compatibility
+issues; see the issue #29 PR test summary for details. These observations do
+not validate physical PS2 ATA/exFAT hardware.
 
 ## Current universal launch (ps2_drivers PR #29)
 
-Canonical PS2 CPS2/MVS releases use **one universal `BOOT.ELF`** copied from
+Canonical PS2 CPS1/CPS2/MVS/NCDZ releases use **one universal `BOOT.ELF`** copied from
 the installed `ps2_drivers_irximg_bootstrap.elf`. It is the **same byte-for-byte
 bootstrap** on USB FAT32, MX4SIO and internal APA/PFS HDD; ATA-backed BDM
 FAT/exFAT is also handled by the generic driver bootstrap. NJEMU no longer
 installs or packages `BOOT_HDD.ELF` or `BOOT_ATA.ELF`.
 
 Each target directory must contain the universal `BOOT.ELF`, the extensionless
-core executable (`MVS` or `CPS2`), `elf_path.ini` naming that executable,
+core executable (`CPS1`, `CPS2`, `MVS` or `NCDZ`), `elf_path.ini` naming that executable,
 `ps2_drivers.irximg`, and the core's installed `lang/`, `font/`, databases,
 and user-provided ROM/cache files. Run the `BOOT.ELF` *in that directory*.
 
