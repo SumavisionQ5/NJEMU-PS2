@@ -17292,54 +17292,82 @@ END
 
 
 
-FILENAME( wofch, cps1, 0, 37, 0, 0 )
-
+FILENAME( wofch, wof, 3, 45, 1, 0 )
 	REGION( 0x200000, CPU1, 0 )
-
-	ROM( 0, tk2=ch=_23.8f, 0x00000, 0x80000, 0x4e0b8dee )
-
-	ROM( 0, tk2=ch=_22.7f, 0x80000, 0x80000, 0xd0937a8d )
-
-
+	ROM( 0, tk2=ch=_23.8f, 0x000000, 0x80000, 0x4e0b8dee )
+	ROM( 0, tk2=ch=_22.7f, 0x080000, 0x80000, 0xd0937a8d )
 
 	REGION( 0x400000, GFX1, 0 )
-
 	ROMX( 0, tk2-1m.3a, 0x000000, 0x80000, 0x0d9cb9bf, 2, 6 )
-
 	ROMX( 0, tk2-3m.5a, 0x000002, 0x80000, 0x45227027, 2, 6 )
-
 	ROMX( 0, tk2-2m.4a, 0x000004, 0x80000, 0xc5ca2460, 2, 6 )
-
 	ROMX( 0, tk2-4m.6a, 0x000006, 0x80000, 0xe349551c, 2, 6 )
-
 	ROMX( 0, tk2=ch=_05.7a, 0x200000, 0x80000, 0xe4a44d53, 2, 6 )
-
 	ROMX( 0, tk2=ch=_06.8a, 0x200002, 0x80000, 0x58066ba8, 2, 6 )
-
 	ROMX( 0, tk2=ch=_07.9a, 0x200004, 0x80000, 0xcc9006c9, 2, 6 )
-
 	ROMX( 0, tk2=ch=_08.10a, 0x200006, 0x80000, 0xd4a19a02, 2, 6 )
 
-
-
-	REGION( 0x38000, CPU2, 0 )
-
+	REGION( 0x28000, CPU2, 0 )
 	ROM( 0, tk2_qa.5k, 0x00000, 0x08000, 0xc9183a0d )
-
-	ROM( 1, 0x10000, 0x18000, 0x00000000 )
-
-
+	ROM( 1,            0x10000, 0x18000, 0x00000000 )
 
 	REGION( 0x200000, SOUND1, 0 )
+	ROM( 0, tk2-q1.1k, 0x000000, 0x80000, 0x611268cf )
+	ROM( 0, tk2-q2.2k, 0x080000, 0x80000, 0x20f55ca9 )
+	ROM( 0, tk2-q3.3k, 0x100000, 0x80000, 0xbfcf6f52 )
+	ROM( 0, tk2-q4.4k, 0x180000, 0x80000, 0x36642e88 )
+END
 
-	ROM( 2, tk2-q1.1k, 0x000000, 0x80000, 0x611268cf )
+FILENAME( wofch3p, wof, 3, 45, 1, 0 )
+	REGION( 0x200000, CPU1, 0 )
+	ROM( 0, tk2=ch=_23.8f, 0x000000, 0x80000, 0x4e0b8dee )
+	ROM( 0, tk2=ch=_22.7f, 0x080000, 0x80000, 0xd0937a8d )
 
-	ROM( 2, tk2-q2.2k, 0x080000, 0x80000, 0x20f55ca9 )
+	REGION( 0x400000, GFX1, 0 )
+	ROMX( 0, tk2-1m.3a, 0x000000, 0x80000, 0x0d9cb9bf, 2, 6 )
+	ROMX( 0, tk2-3m.5a, 0x000002, 0x80000, 0x45227027, 2, 6 )
+	ROMX( 0, tk2-2m.4a, 0x000004, 0x80000, 0xc5ca2460, 2, 6 )
+	ROMX( 0, tk2-4m.6a, 0x000006, 0x80000, 0xe349551c, 2, 6 )
+	ROMX( 0, tk2=ch=_05.7a, 0x200000, 0x80000, 0xe4a44d53, 2, 6 )
+	ROMX( 0, tk2=ch=_06.8a, 0x200002, 0x80000, 0x58066ba8, 2, 6 )
+	ROMX( 0, tk2=ch=_07.9a, 0x200004, 0x80000, 0xcc9006c9, 2, 6 )
+	ROMX( 0, tk2=ch=_08.10a, 0x200006, 0x80000, 0xd4a19a02, 2, 6 )
 
-	ROM( 2, tk2-q3.3k, 0x100000, 0x80000, 0xbfcf6f52 )
+	REGION( 0x28000, CPU2, 0 )
+	ROM( 0, tk2_qa.5k, 0x00000, 0x08000, 0xc9183a0d )
+	ROM( 1,            0x10000, 0x18000, 0x00000000 )
 
-	ROM( 2, tk2-q4.4k, 0x180000, 0x80000, 0x36642e88 )
+	REGION( 0x200000, SOUND1, 0 )
+	ROM( 0, tk2-q1.1k, 0x000000, 0x80000, 0x611268cf )
+	ROM( 0, tk2-q2.2k, 0x080000, 0x80000, 0x20f55ca9 )
+	ROM( 0, tk2-q3.3k, 0x100000, 0x80000, 0xbfcf6f52 )
+	ROM( 0, tk2-q4.4k, 0x180000, 0x80000, 0x36642e88 )
+END
 
+FILENAME( wofchs, wof, 3, 45, 1, 0 )
+	REGION( 0x200000, CPU1, 0 )
+	ROM( 0, tk2a_23b.rom, 0x000000, 0x80000, 0x2D70231A )
+	ROM( 0, tk2a_22b.rom, 0x080000, 0x80000, 0x5EAC2794 )
+
+	REGION( 0x400000, GFX1, 0 )
+	ROMX( 0, tk2_gfx1.rom, 0x000000, 0x80000, 0x0d9cb9bf, 2, 6 )
+	ROMX( 0, tk2_gfx3.rom, 0x000002, 0x80000, 0x45227027, 2, 6 )
+	ROMX( 0, tk2_gfx2.rom, 0x000004, 0x80000, 0xc5ca2460, 2, 6 )
+	ROMX( 0, tk2_gfx4.rom, 0x000006, 0x80000, 0xe349551c, 2, 6 )
+	ROMX( 0, tk2_gfx5.rom, 0x200000, 0x80000, 0x38A90EB1, 2, 6 )
+	ROMX( 0, tk2_gfx7.rom, 0x200002, 0x80000, 0xFA1E10CA, 2, 6 )
+	ROMX( 0, tk2_gfx6.rom, 0x200004, 0x80000, 0x0B0B156C, 2, 6 )
+	ROMX( 0, tk2_gfx8.rom, 0x200006, 0x80000, 0x76B9E160, 2, 6 )
+
+	REGION( 0x28000, CPU2, 0 )
+	ROM( 0, tk2_qa.rom, 0x00000, 0x08000, 0xc9183a0d )
+	ROM( 1,             0x10000, 0x18000, 0x00000000 )
+
+	REGION( 0x200000, SOUND1, 0 )
+	ROM( 0, tk2_q1.rom, 0x000000, 0x80000, 0x611268cf )
+	ROM( 0, tk2_q2.rom, 0x080000, 0x80000, 0x20f55ca9 )
+	ROM( 0, tk2_q3.rom, 0x100000, 0x80000, 0xbfcf6f52 )
+	ROM( 0, tk2_q4.rom, 0x180000, 0x80000, 0x36642e88 )
 END
 
 
@@ -20661,60 +20689,58 @@ END
 
 
 
-FILENAME( wofchp, wofch, 0, 37, 0, 0 )
-
+FILENAME( wofchp, wof, 3, 45, 1, 0 )
 	REGION( 0x200000, CPU1, 0 )
-
-	ROM( 0, tk2=ch=eh_23.8f, 0x00000, 0x80000, 0x2bce786a )
-
-	ROM( 0, tk2=ch=eh_22.7f, 0x80000, 0x80000, 0xe0c80d47 )
+	ROM( 0, tk2=ch=eh_23.8f, 0x000000, 0x80000, 0x2bce786a )
+	ROM( 0, tk2=ch=eh_22.7f, 0x080000, 0x80000, 0xe0c80d47 )
 
 	REGION( 0x400000, GFX1, 0 )
-	ROMX( 0, tk2-1m.3a, 0x000000, 0x080000, 0x0d9cb9bf, 2, 6 )
-	ROMX( 0, tk2-3m.5a, 0x000002, 0x080000, 0x45227027, 2, 6 )
-	ROMX( 0, tk2-2m.4a, 0x000004, 0x080000, 0xc5ca2460, 2, 6 )
-	ROMX( 0, tk2-4m.6a, 0x000006, 0x080000, 0xe349551c, 2, 6 )
-	ROMX( 0, tk2=ch=_05.7a, 0x200000, 0x080000, 0xe4a44d53, 2, 6 )
-	ROMX( 0, tk2=ch=_06.8a, 0x200002, 0x080000, 0x58066ba8, 2, 6 )
-	ROMX( 0, tk2=ch=_07.9a, 0x200004, 0x080000, 0xcc9006c9, 2, 6 )
-	ROMX( 0, tk2=ch=_08.10a, 0x200006, 0x080000, 0xd4a19a02, 2, 6 )
-	REGION( 0x38000, CPU2, 0 )
+	ROMX( 0, tk2-1m.3a, 0x000000, 0x80000, 0x0d9cb9bf, 2, 6 )
+	ROMX( 0, tk2-3m.5a, 0x000002, 0x80000, 0x45227027, 2, 6 )
+	ROMX( 0, tk2-2m.4a, 0x000004, 0x80000, 0xc5ca2460, 2, 6 )
+	ROMX( 0, tk2-4m.6a, 0x000006, 0x80000, 0xe349551c, 2, 6 )
+	ROMX( 0, tk2=ch=_05.7a, 0x200000, 0x80000, 0xe4a44d53, 2, 6 )
+	ROMX( 0, tk2=ch=_06.8a, 0x200002, 0x80000, 0x58066ba8, 2, 6 )
+	ROMX( 0, tk2=ch=_07.9a, 0x200004, 0x80000, 0xcc9006c9, 2, 6 )
+	ROMX( 0, tk2=ch=_08.10a, 0x200006, 0x80000, 0xd4a19a02, 2, 6 )
+
+	REGION( 0x28000, CPU2, 0 )
 	ROM( 0, tk2_qa.5k, 0x00000, 0x08000, 0xc9183a0d )
-	ROM( 1, 0x10000, 0x18000, 0x00000000 )
+	ROM( 1,            0x10000, 0x18000, 0x00000000 )
+
 	REGION( 0x200000, SOUND1, 0 )
-	ROM( 2, tk2-q1.1k, 0x000000, 0x080000, 0x611268cf )
-	ROM( 2, tk2-q2.2k, 0x080000, 0x080000, 0x20f55ca9 )
-	ROM( 2, tk2-q3.3k, 0x100000, 0x080000, 0xbfcf6f52 )
-	ROM( 2, tk2-q4.4k, 0x180000, 0x080000, 0x36642e88 )
+	ROM( 0, tk2-q1.1k, 0x000000, 0x80000, 0x611268cf )
+	ROM( 0, tk2-q2.2k, 0x080000, 0x80000, 0x20f55ca9 )
+	ROM( 0, tk2-q3.3k, 0x100000, 0x80000, 0xbfcf6f52 )
+	ROM( 0, tk2-q4.4k, 0x180000, 0x80000, 0x36642e88 )
 END
 
 
 
-FILENAME( wofchdx, wofch, 0, 37, 0, 0 )
-
+FILENAME( wofchdx, wof, 3, 45, 1, 0 )
 	REGION( 0x200000, CPU1, 0 )
-
-	ROM( 0, tk2=ch=dx_23.8f, 0x00000, 0x80000, 0xa1696ca4 )
-
-	ROM( 0, tk2=ch=dx_22.7f, 0x80000, 0x80000, 0x00d388c0 )
+	ROM( 0, tk2=ch=dx_23.8f, 0x000000, 0x80000, 0xa1696ca4 )
+	ROM( 0, tk2=ch=dx_22.7f, 0x080000, 0x80000, 0x00d388c0 )
 
 	REGION( 0x400000, GFX1, 0 )
-	ROMX( 0, tk2-1m.3a, 0x000000, 0x080000, 0x0d9cb9bf, 2, 6 )
-	ROMX( 0, tk2-3m.5a, 0x000002, 0x080000, 0x45227027, 2, 6 )
-	ROMX( 0, tk2-2m.4a, 0x000004, 0x080000, 0xc5ca2460, 2, 6 )
-	ROMX( 0, tk2-4m.6a, 0x000006, 0x080000, 0xe349551c, 2, 6 )
-	ROMX( 0, tk2=ch=_05.7a, 0x200000, 0x080000, 0xe4a44d53, 2, 6 )
-	ROMX( 0, tk2=ch=_06.8a, 0x200002, 0x080000, 0x58066ba8, 2, 6 )
-	ROMX( 0, tk2=ch=_07.9a, 0x200004, 0x080000, 0xcc9006c9, 2, 6 )
-	ROMX( 0, tk2=ch=_08.10a, 0x200006, 0x080000, 0xd4a19a02, 2, 6 )
-	REGION( 0x38000, CPU2, 0 )
+	ROMX( 0, tk2-1m.3a, 0x000000, 0x80000, 0x0d9cb9bf, 2, 6 )
+	ROMX( 0, tk2-3m.5a, 0x000002, 0x80000, 0x45227027, 2, 6 )
+	ROMX( 0, tk2-2m.4a, 0x000004, 0x80000, 0xc5ca2460, 2, 6 )
+	ROMX( 0, tk2-4m.6a, 0x000006, 0x80000, 0xe349551c, 2, 6 )
+	ROMX( 0, tk2=ch=_05.7a, 0x200000, 0x80000, 0xe4a44d53, 2, 6 )
+	ROMX( 0, tk2=ch=_06.8a, 0x200002, 0x80000, 0x58066ba8, 2, 6 )
+	ROMX( 0, tk2=ch=_07.9a, 0x200004, 0x80000, 0xcc9006c9, 2, 6 )
+	ROMX( 0, tk2=ch=_08.10a, 0x200006, 0x80000, 0xd4a19a02, 2, 6 )
+
+	REGION( 0x28000, CPU2, 0 )
 	ROM( 0, tk2_qa.5k, 0x00000, 0x08000, 0xc9183a0d )
-	ROM( 1, 0x10000, 0x18000, 0x00000000 )
+	ROM( 1,            0x10000, 0x18000, 0x00000000 )
+
 	REGION( 0x200000, SOUND1, 0 )
-	ROM( 2, tk2-q1.1k, 0x000000, 0x080000, 0x611268cf )
-	ROM( 2, tk2-q2.2k, 0x080000, 0x080000, 0x20f55ca9 )
-	ROM( 2, tk2-q3.3k, 0x100000, 0x080000, 0xbfcf6f52 )
-	ROM( 2, tk2-q4.4k, 0x180000, 0x080000, 0x36642e88 )
+	ROM( 0, tk2-q1.1k, 0x000000, 0x80000, 0x611268cf )
+	ROM( 0, tk2-q2.2k, 0x080000, 0x80000, 0x20f55ca9 )
+	ROM( 0, tk2-q3.3k, 0x100000, 0x80000, 0xbfcf6f52 )
+	ROM( 0, tk2-q4.4k, 0x180000, 0x80000, 0x36642e88 )
 END
 
 
