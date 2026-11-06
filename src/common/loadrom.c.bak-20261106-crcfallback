@@ -1,0 +1,328 @@
+/******************************************************************************
+
+	loadrom.c
+
+	ROM Image File Load Functions
+
+******************************************************************************/
+
+#include <limits.h>
+#include <sys/unistd.h>
+#include "emucfg.h"
+#include "common/emulator_runtime.h"
+#include "common/input_driver.h"
+#include "common/loadrom.h"
+#include "common/runtime_paths.h"
+#include "common/path_utils.h"
+#include "common/ui_text_driver.h"
+#include "common/ui.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "common/zip_archive.h"
+
+#if (EMU_SYSTEM != NCDZ)
+
+static void byte_swap_pairs_in_place(uint8_t *data, size_t length)
+{
+	size_t i;
+	for (i = 0; i + 1 < length; i += 2)
+	{
+		uint8_t tmp = data[i];
+		data[i] = data[i + 1];
+		data[i + 1] = tmp;
+	}
+}
+
+
+/******************************************************************************
+	Local Variables
+******************************************************************************/
+
+static zip_archive_t rom_archive;
+static zip_entry_t rom_entry;
+
+#if defined(GUI)
+#define ROM_LOAD_PROGRESS_MIN_SIZE (128 * 1024)
+#define ROM_LOAD_PROGRESS_STEPS 4
+
+typedef struct
+{
+	size_t step;
+	size_t next;
+	unsigned percent;
+} rom_load_progress_t;
+
+static void init_rom_load_progress(rom_load_progress_t *progress, size_t total)
+{
+	if (total < ROM_LOAD_PROGRESS_MIN_SIZE)
+	{
+		progress->step = 0;
+		progress->next = 0;
+		progress->percent = 0;
+		return;
+	}
+
+	progress->step = (total + ROM_LOAD_PROGRESS_STEPS - 1) / ROM_LOAD_PROGRESS_STEPS;
+	progress->next = progress->step;
+	progress->percent = 100 / ROM_LOAD_PROGRESS_STEPS;
+}
+
+static void report_rom_load_progress(rom_load_progress_t *progress, size_t current)
+{
+	if (progress->step == 0 || current < progress->next)
+		return;
+
+	msg_printf("  %u%%\r", progress->percent);
+	progress->next += progress->step;
+	progress->percent += 100 / ROM_LOAD_PROGRESS_STEPS;
+	if (progress->percent > 100)
+		progress->percent = 100;
+}
+
+static void file_read_with_progress(uint8_t *buf, size_t length)
+{
+	size_t offset = 0;
+	size_t chunk_size = length;
+	rom_load_progress_t progress;
+
+	init_rom_load_progress(&progress, length);
+	if (progress.step != 0)
+		chunk_size = progress.step;
+
+	while (offset < length)
+	{
+		size_t chunk = length - offset;
+
+		if (chunk > chunk_size)
+			chunk = chunk_size;
+
+		file_read(buf + offset, chunk);
+		offset += chunk;
+		report_rom_load_progress(&progress, offset);
+	}
+}
+#endif
+
+
+/******************************************************************************
+	ROM File Reading
+******************************************************************************/
+
+/*--------------------------------------------------------
+	Search and Open File from ZIP File
+--------------------------------------------------------*/
+
+rom_file_open_result_t file_open(const char *fname1, const char *fname2, const uint32_t crc, char *fname)
+{
+	int i;
+	zip_entry_info_t info;
+	char path[PATH_MAX];
+
+	file_close();
+
+	for (i = 0; i < 3; i++)
+	{
+		switch (i)
+		{
+		case 0: if (!path_format(path, sizeof(path), "%s/%s.zip", game_dir, fname1)) continue; break;
+		case 1: if (!path_format(path, sizeof(path), "%s/%s.zip", game_dir, fname2)) continue; break;
+		case 2: if (!path_format(path, sizeof(path), "%sroms/%s.zip", launchDir, fname2)) continue; break;
+		}
+
+		if (zip_archive_open(&rom_archive, path))
+		{
+			if (zip_archive_find_crc(&rom_archive, crc, &info))
+			{
+				if (fname)
+					strcpy(fname, info.name);
+				if (zip_entry_open(&rom_archive, info.name, &rom_entry))
+				{
+					return ROM_FILE_OPEN_OK;
+				}
+				zip_archive_close(&rom_archive);
+				return ROM_FILE_OPEN_NOT_FOUND;
+			}
+
+			if (fname && zip_archive_stat(&rom_archive, fname, &info))
+			{
+				zip_archive_close(&rom_archive);
+				return ROM_FILE_OPEN_CRC_MISMATCH;
+			}
+
+			zip_archive_close(&rom_archive);
+		}
+
+		if (fname2 == NULL)
+			break;
+	}
+
+	return ROM_FILE_OPEN_NOT_FOUND;
+}
+
+
+/*--------------------------------------------------------
+	Close File
+--------------------------------------------------------*/
+
+void file_close(void)
+{
+	zip_entry_close(&rom_entry);
+	zip_archive_close(&rom_archive);
+}
+
+
+/*--------------------------------------------------------
+	Read Specified Bytes from File
+--------------------------------------------------------*/
+
+size_t file_read(void *buf, size_t length)
+{
+	if (zip_entry_is_open(&rom_entry))
+		return zip_entry_read(&rom_entry, buf, length);
+	return (size_t)-1;
+}
+
+
+/*--------------------------------------------------------
+	Read 1 Character from File
+--------------------------------------------------------*/
+
+int file_getc(void)
+{
+	if (zip_entry_is_open(&rom_entry))
+		return zip_entry_getc(&rom_entry);
+	return -1;
+}
+
+
+/*--------------------------------------------------------
+	Load ROM
+--------------------------------------------------------*/
+
+int rom_load(struct rom_t *rom, uint8_t *mem, int idx, int max)
+{
+	uint32_t offset, length;
+
+_continue:
+	offset = rom[idx].offset;
+
+	if (rom[idx].skip == 0)
+	{
+	#if defined(GUI)
+		file_read_with_progress(&mem[offset], rom[idx].length);
+	#else
+		file_read(&mem[offset], rom[idx].length);
+	#endif
+
+		if (rom[idx].type == ROM_WORDSWAP)
+			byte_swap_pairs_in_place(&mem[offset], rom[idx].length);
+	}
+	else
+	{
+		int c;
+		int skip = rom[idx].skip + rom[idx].group;
+#if defined(GUI)
+		rom_load_progress_t progress;
+		init_rom_load_progress(&progress, rom[idx].length);
+#endif
+
+		length = 0;
+
+		if (rom[idx].group == 1)
+		{
+			if (rom[idx].type == ROM_WORDSWAP)
+				offset ^= 1;
+
+			while (length < rom[idx].length)
+			{
+				if ((c = file_getc()) == EOF) break;
+				mem[offset] = c;
+				offset += skip;
+				length++;
+#if defined(GUI)
+				report_rom_load_progress(&progress, length);
+#endif
+			}
+		}
+		else
+		{
+			while (length < rom[idx].length)
+			{
+				if ((c = file_getc()) == EOF) break;
+				mem[offset + 0] = c;
+				if ((c = file_getc()) == EOF) break;
+				mem[offset + 1] = c;
+				offset += skip;
+				length += 2;
+#if defined(GUI)
+				report_rom_load_progress(&progress, length);
+#endif
+			}
+		}
+	}
+
+	if (++idx != max)
+	{
+		if (rom[idx].type == ROM_CONTINUE)
+		{
+			goto _continue;
+		}
+	}
+
+	return idx;
+}
+
+#endif /* EMU_SYSTEM */
+
+
+/******************************************************************************
+	Display Error Messages
+******************************************************************************/
+
+/*------------------------------------------------------
+	Display Memory Allocation Error Message
+------------------------------------------------------*/
+
+void error_memory(const char *mem_name)
+{
+#if (EMU_SYSTEM != NCDZ)
+	file_close();
+#endif
+	msg_printf(TEXT(COULD_NOT_ALLOCATE_x_MEMORY), mem_name);
+	msg_printf(TEXT(PRESS_ANY_BUTTON2));
+	pad_wait_press(PAD_WAIT_INFINITY);
+	Loop = LOOP_BROWSER;
+}
+
+
+/*------------------------------------------------------
+	Display CRC Error Message
+------------------------------------------------------*/
+
+void error_crc(const char *rom_name)
+{
+#if (EMU_SYSTEM != NCDZ)
+	file_close();
+#endif
+	msg_printf(TEXT(CRC32_NOT_CORRECT_x), rom_name);
+	msg_printf(TEXT(PRESS_ANY_BUTTON2));
+	pad_wait_press(PAD_WAIT_INFINITY);
+	Loop = LOOP_BROWSER;
+}
+
+
+/*------------------------------------------------------
+	Display ROM File Error Message
+------------------------------------------------------*/
+
+void error_file(const char *rom_name)
+{
+#if (EMU_SYSTEM != NCDZ)
+	file_close();
+#endif
+	msg_printf(TEXT(FILE_NOT_FOUND_x), rom_name);
+	msg_printf(TEXT(PRESS_ANY_BUTTON2));
+	pad_wait_press(PAD_WAIT_INFINITY);
+	Loop = LOOP_BROWSER;
+}

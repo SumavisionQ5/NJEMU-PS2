@@ -118,8 +118,14 @@ rom_file_open_result_t file_open(const char *fname1, const char *fname2, const u
 	int i;
 	zip_entry_info_t info;
 	char path[PATH_MAX];
+	char fallback_path[PATH_MAX];
+	char fallback_name[PATH_MAX];
+	bool have_fallback = false;
 
 	file_close();
+
+	fallback_path[0] = '\0';
+	fallback_name[0] = '\0';
 
 	for (i = 0; i < 3; i++)
 	{
@@ -144,10 +150,18 @@ rom_file_open_result_t file_open(const char *fname1, const char *fname2, const u
 				return ROM_FILE_OPEN_NOT_FOUND;
 			}
 
-			if (fname && zip_archive_stat(&rom_archive, fname, &info))
+			/*
+			 * CRC miss but the expected file name is present.  Remember the
+			 * first such entry and keep scanning: a parent archive may still
+			 * hold the byte-exact copy, which must win over a stale local one.
+			 */
+			if (fname && !have_fallback && zip_archive_stat(&rom_archive, fname, &info))
 			{
-				zip_archive_close(&rom_archive);
-				return ROM_FILE_OPEN_CRC_MISMATCH;
+				strncpy(fallback_path, path, sizeof(fallback_path) - 1);
+				fallback_path[sizeof(fallback_path) - 1] = '\0';
+				strncpy(fallback_name, info.name, sizeof(fallback_name) - 1);
+				fallback_name[sizeof(fallback_name) - 1] = '\0';
+				have_fallback = true;
 			}
 
 			zip_archive_close(&rom_archive);
@@ -155,6 +169,20 @@ rom_file_open_result_t file_open(const char *fname1, const char *fname2, const u
 
 		if (fname2 == NULL)
 			break;
+	}
+
+	/*
+	 * No archive carried the expected CRC.  Fall back to the same-named entry
+	 * so a ROM set whose files were updated in place (name kept, CRC changed)
+	 * still loads instead of aborting the whole game with a CRC error.
+	 */
+	if (have_fallback && zip_archive_open(&rom_archive, fallback_path))
+	{
+		if (zip_entry_open(&rom_archive, fallback_name, &rom_entry))
+		{
+			return ROM_FILE_OPEN_OK;
+		}
+		zip_archive_close(&rom_archive);
 	}
 
 	return ROM_FILE_OPEN_NOT_FOUND;
